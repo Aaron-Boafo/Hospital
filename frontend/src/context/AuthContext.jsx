@@ -1,32 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup,
+  signOut, sendPasswordResetEmail, updatePassword,
+  reauthenticateWithCredential, EmailAuthProvider,
+} from 'firebase/auth';
+import { auth, googleProvider, firebaseConfigError } from '../config/firebase';
+import { login as exchangeToken, logout as clearToken } from '../services/auth';
 
 const AuthContext = createContext(null);
 
-const USERS_STORAGE_KEY = 'hms_users';
-
-const DEFAULT_USERS = [
-  { id: 'usr-001', username: 'admin', password: 'password123', name: 'Dr. Sarah Admin', role: 'admin', email: 'admin@medicare.com', phone: '+233 54 000 0001', active: true, createdAt: '2026-01-01' },
-  { id: 'usr-002', username: 'doctor', password: 'password123', name: 'Dr. James Wilson', role: 'doctor', email: 'wilson@medicare.com', phone: '+233 54 000 0002', active: true, createdAt: '2026-01-01' },
-  { id: 'usr-003', username: 'receptionist', password: 'password123', name: 'Emily Carter', role: 'receptionist', email: 'carter@medicare.com', phone: '+233 54 000 0003', active: true, createdAt: '2026-01-01' },
-  { id: 'usr-004', username: 'accountant', password: 'password123', name: 'Michael Brown', role: 'accountant', email: 'brown@medicare.com', phone: '+233 54 000 0004', active: true, createdAt: '2026-01-01' },
-];
-
-function loadUsers() {
-  try {
-    const saved = localStorage.getItem(USERS_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
-  return DEFAULT_USERS;
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-}
+const SESSION_KEY = 'hms_user';
 
 export const ROLE_ACCESS = {
   admin: ['dashboard', 'patients', 'appointments', 'doctors', 'billing', 'clinical', 'staff', 'reports', 'laboratory', 'pharmacy', 'prescriptions', 'beds'],
@@ -37,7 +20,45 @@ export const ROLE_ACCESS = {
 
 export const ROLES = ['admin', 'doctor', 'receptionist', 'accountant'];
 
-function LoadingScreen() {
+const FIREBASE_ERROR_MESSAGES = {
+  'auth/invalid-credential': 'Invalid email or password',
+  'auth/wrong-password': 'Invalid email or password',
+  'auth/user-not-found': 'No account found with this email',
+  'auth/invalid-email': 'Please enter a valid email address',
+  'auth/too-many-requests': 'Too many attempts — try again later',
+  'auth/popup-closed-by-user': 'Sign-in cancelled',
+  'auth/network-request-failed': 'Network error — check your connection',
+  'auth/email-already-in-use': 'An account with this email already exists',
+  'auth/weak-password': 'Password must be at least 6 characters',
+};
+
+function firebaseErrorMessage(err) {
+  return FIREBASE_ERROR_MESSAGES[err?.code] || err?.message || 'Authentication failed';
+}
+
+function normalizeUser(user) {
+  if (!user) return null;
+  return { ...user, role: String(user.role || '').toLowerCase() };
+}
+
+function loadCachedUser() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SESSION_KEY));
+    return cached && cached.id ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(user) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+export function LoadingScreen() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -56,111 +77,117 @@ function LoadingScreen() {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [users, setUsers] = useState(loadUsers);
+  const [user, setUser] = useState(loadCachedUser);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
 
-  useEffect(() => {
-    const saved = localStorage.getItem('hms_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.id && parsed.role && users.some(u => u.id === parsed.id)) {
-          setUser(parsed);
-        }
-      } catch {}
-    }
-    setLoading(false);
+  const exchangeAndSetUser = useCallback(async (idToken) => {
+    const backendUser = await exchangeToken(idToken);
+    const normalized = normalizeUser(backendUser);
+    setUser(normalized);
+    saveSession(normalized);
+    return normalized;
   }, []);
 
   useEffect(() => {
-    saveUsers(users);
-  }, [users]);
+    if (!auth) {
+      setAuthError(firebaseConfigError);
+      setLoading(false);
+      return undefined;
+    }
 
-  const login = (username, password) => {
-    const found = users.find(
-      u => u.username === username && u.password === password && u.active
-    );
-    if (!found) return { success: false, error: 'Invalid username or password' };
+    setLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          const idToken = await firebaseUser.getIdToken();
+          await exchangeAndSetUser(idToken);
+          setAuthError('');
+        } else {
+          setUser(null);
+          clearSession();
+        }
+      } catch (err) {
+        setUser(null);
+        clearSession();
+        setAuthError(err?.message || 'Session could not be restored');
+      } finally {
+        setLoading(false);
+      }
+    });
+    return unsubscribe;
+  }, [exchangeAndSetUser]);
 
-    const session = { id: found.id, username: found.username, name: found.name, role: found.role };
-    setUser(session);
-    localStorage.setItem('hms_user', JSON.stringify(session));
-    return { success: true };
-  };
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      clearSession();
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('hms_user');
-  };
+  const login = useCallback(async (email, password) => {
+    if (!auth) throw new Error(firebaseConfigError || 'Firebase is not configured');
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await credential.user.getIdToken();
+      await exchangeAndSetUser(idToken);
+      setAuthError('');
+    } catch (err) {
+      throw new Error(firebaseErrorMessage(err));
+    }
+  }, [exchangeAndSetUser]);
 
-  const hasAccess = (feature) => {
+  const loginWithGoogle = useCallback(async () => {
+    if (!auth || !googleProvider) throw new Error(firebaseConfigError || 'Firebase is not configured');
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      const idToken = await credential.user.getIdToken();
+      await exchangeAndSetUser(idToken);
+      setAuthError('');
+    } catch (err) {
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        throw new Error(firebaseErrorMessage(err));
+      }
+    }
+  }, [exchangeAndSetUser]);
+
+  const logout = useCallback(async () => {
+    try {
+      if (auth) await signOut(auth);
+    } finally {
+      clearToken();
+      setUser(null);
+      clearSession();
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email) => {
+    if (!auth) throw new Error(firebaseConfigError || 'Firebase is not configured');
+    await sendPasswordResetEmail(auth, email);
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    if (!auth?.currentUser?.email) throw new Error('No active session');
+    const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+    await reauthenticateWithCredential(auth.currentUser, credential);
+    await updatePassword(auth.currentUser, newPassword);
+  }, []);
+
+  const hasAccess = useCallback((feature) => {
     if (!user) return false;
     return ROLE_ACCESS[user.role]?.includes(feature) ?? false;
-  };
+  }, [user]);
 
-  const isAdmin = () => user?.role === 'admin';
-
-  const changePassword = useCallback((userId, currentPassword, newPassword) => {
-    const idx = users.findIndex(u => u.id === userId);
-    if (idx === -1) return { success: false, error: 'User not found' };
-    if (users[idx].password !== currentPassword) return { success: false, error: 'Current password is incorrect' };
-    if (newPassword.length < 6) return { success: false, error: 'New password must be at least 6 characters' };
-
-    const updated = [...users];
-    updated[idx] = { ...updated[idx], password: newPassword };
-    setUsers(updated);
-    return { success: true };
-  }, [users]);
-
-  const resetPassword = useCallback((username, email) => {
-    const found = users.find(u => u.username === username && u.email === email);
-    if (!found) return { success: false, error: 'No account found with that username and email' };
-
-    const tempPassword = 'reset-' + Math.random().toString(36).slice(-8);
-    const updated = users.map(u => u.id === found.id ? { ...u, password: tempPassword } : u);
-    setUsers(updated);
-    return { success: true, tempPassword };
-  }, [users]);
-
-  const registerUser = useCallback((userData) => {
-    if (users.some(u => u.username === userData.username)) {
-      return { success: false, error: 'Username already exists' };
-    }
-    if (users.some(u => u.email === userData.email)) {
-      return { success: false, error: 'Email already exists' };
-    }
-    if (!userData.password || userData.password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters' };
-    }
-
-    const newUser = {
-      id: 'usr-' + uuidv4().slice(0, 8),
-      username: userData.username,
-      password: userData.password,
-      name: userData.name,
-      role: userData.role,
-      email: userData.email,
-      phone: userData.phone || '',
-      active: true,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    setUsers(prev => [...prev, newUser]);
-    return { success: true, user: newUser };
-  }, [users]);
-
-  const updateUser = useCallback((id, updates) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-  }, []);
-
-  const deleteUser = useCallback((id) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-  }, []);
-
-  if (loading) return <LoadingScreen />;
+  const isAdmin = useCallback(() => user?.role === 'admin', [user]);
 
   return (
-    <AuthContext.Provider value={{ user, users, login, logout, hasAccess, isAdmin, changePassword, resetPassword, registerUser, updateUser, deleteUser }}>
+    <AuthContext.Provider value={{
+      user, loading, authError,
+      login, loginWithGoogle, logout, resetPassword, changePassword,
+      hasAccess, isAdmin,
+    }}>
       {children}
     </AuthContext.Provider>
   );

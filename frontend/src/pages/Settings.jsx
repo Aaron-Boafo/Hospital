@@ -38,7 +38,7 @@ const DATE_FORMAT_OPTIONS = [
 
 export default function Settings() {
   const { activities, patients, doctors, appointments, bills } = useData();
-  const { user, users } = useAuth();
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('general');
   const [saved, setSaved] = useState(false);

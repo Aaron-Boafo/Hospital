@@ -23,8 +23,8 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     username: user?.username || '',
-    email: `${user?.username || 'user'}@medicare.com`,
-    phone: '+233 54 123 4567',
+    email: user?.email || '',
+    phone: user?.phone || '',
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -42,7 +42,7 @@ export default function Profile() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setPasswordError('');
     setPasswordSaved(false);
@@ -64,13 +64,13 @@ export default function Profile() {
       return;
     }
 
-    const result = changePassword(user.id, passwordData.currentPassword, passwordData.newPassword);
-    if (result.success) {
+    try {
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
       setPasswordSaved(true);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setTimeout(() => setPasswordSaved(false), 3000);
-    } else {
-      setPasswordError(result.error);
+    } catch (err) {
+      setPasswordError(err?.message || 'Could not update password');
     }
   };
 
@@ -78,8 +78,8 @@ export default function Profile() {
     setFormData({
       name: user?.name || '',
       username: user?.username || '',
-      email: `${user?.username || 'user'}@medicare.com`,
-      phone: '+233 54 123 4567',
+      email: user?.email || '',
+      phone: user?.phone || '',
     });
     setEditing(false);
   };
