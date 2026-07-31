@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import { eq } from "drizzle-orm";
 import { jwtConfig } from "../config/jwt.config.js";
+import { AUTH_COOKIE_NAME } from "../config/cookie.config.js";
 import { db } from "../database/db.js";
 import { users } from "../database/schema/schema.js";
 import type { User } from "../database/schema/types.js";
@@ -17,7 +18,9 @@ declare global {
 export const authenticate: RequestHandler = async (req, res, next) => {
   try {
     const header = req.header("authorization");
-    const token = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
+    const bearerToken = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
+    const cookieToken = req.cookies?.[AUTH_COOKIE_NAME] as string | undefined;
+    const token = cookieToken ?? bearerToken;
     if (!token) throw new ServerError("Authentication token is missing", 401);
 
     let sub: string;

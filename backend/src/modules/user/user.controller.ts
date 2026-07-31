@@ -1,12 +1,22 @@
 import { ServerError } from "@/shared/errors/index.js";
+import {
+  AUTH_COOKIE_NAME,
+  authCookieOptions,
+} from "@/shared/config/cookie.config.js";
 import { asyncHandler } from "@/shared/utils/index.js";
 import { userService } from "./user.service.js";
 import { loginSchema } from "./user.validation.js";
 
 export const login = asyncHandler(async (req, res) => {
   const parsed = loginSchema.parse(req.body);
-  const result = await userService.loginWithFirebase(parsed);
-  res.json(result);
+  const { token, user } = await userService.loginWithFirebase(parsed);
+  res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions);
+  res.json({ user });
+});
+
+export const logout = asyncHandler(async (_req, res) => {
+  res.clearCookie(AUTH_COOKIE_NAME, authCookieOptions);
+  res.json({ success: true });
 });
 
 export const me = asyncHandler(async (req, res) => {

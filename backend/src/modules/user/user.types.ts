@@ -13,7 +13,7 @@ export interface UserDto {
   createdAt: Date;
 }
 
-export interface AuthResponse {
+export interface AuthResult {
   token: string;
   user: UserDto;
 }

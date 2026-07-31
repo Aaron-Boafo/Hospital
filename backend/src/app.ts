@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import cookieParser from "cookie-parser";
 import "dotenv/config";
 import { logger } from "@/shared/logger/index.js";
 import { pool } from "@/shared/database/db.js";
@@ -33,6 +34,7 @@ app.use(requestId);
 app.use(securityHeaders);
 app.use(corsMiddleware);
 app.use(express.json());
+app.use(cookieParser());
 app.use(requestLogger);
 app.use(rateLimiter);
 
@@ -44,7 +46,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.use(userRouter);
+app.use("/api", userRouter);
 
 app.use(
   "/api",

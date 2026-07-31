@@ -5,7 +5,7 @@ import {
   reauthenticateWithCredential, EmailAuthProvider,
 } from 'firebase/auth';
 import { auth, googleProvider, firebaseConfigError } from '../config/firebase';
-import { login as exchangeToken, logout as clearToken } from '../services/auth';
+import { login as exchangeToken, logout as clearBackendSession } from '../services/auth';
 
 const AuthContext = createContext(null);
 
@@ -157,7 +157,11 @@ export function AuthProvider({ children }) {
     try {
       if (auth) await signOut(auth);
     } finally {
-      clearToken();
+      try {
+        await clearBackendSession();
+      } catch {
+        // backend session cookie is cleared on the next failed request
+      }
       setUser(null);
       clearSession();
     }

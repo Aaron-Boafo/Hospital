@@ -3,6 +3,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import CookieConsent from './components/CookieConsent';
 import DashboardLayout from './components/DashboardLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
+          <CookieConsent />
         </ThemeProvider>
         </DataProvider>
       </AuthProvider>

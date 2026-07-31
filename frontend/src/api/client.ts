@@ -7,8 +7,7 @@ declare module 'axios' {
   }
 }
 
-export const TOKEN_KEY = 'hms_token'
-const SESSION_KEY = 'hms_user'
+export const SESSION_KEY = 'hms_user'
 
 export interface ApiIssue {
   path: string
@@ -30,34 +29,28 @@ export class ApiError extends Error {
 const instance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:1000/api',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
 
-instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY)
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+let refreshPromise: Promise<boolean> | null = null
 
-let refreshPromise: Promise<string | null> | null = null
-
-async function exchangeIdToken(): Promise<string | null> {
+async function exchangeIdToken(): Promise<boolean> {
   try {
     const { auth } = await import('../config/firebase')
     const firebaseUser = auth?.currentUser
-    if (!firebaseUser) return null
+    if (!firebaseUser) return false
     const idToken = await firebaseUser.getIdToken(true)
-    const { data } = await instance.post<{ token: string }>('/auth/login', { idToken })
-    setAuthToken(data.token)
-    return data.token
+    await instance.post('/auth/login', { idToken })
+    return true
   } catch {
-    return null
+    return false
   }
 }
 
 function clearSession(): void {
-  setAuthToken(null)
   localStorage.removeItem(SESSION_KEY)
   window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+  void instance.post('/auth/logout').catch(() => undefined)
 }
 
 instance.interceptors.response.use(
@@ -70,10 +63,9 @@ instance.interceptors.response.use(
     if (status === 401 && config && !isAuthEndpoint && !config._retry) {
       try {
         refreshPromise ??= exchangeIdToken()
-        const newToken = await refreshPromise
-        if (newToken) {
+        const refreshed = await refreshPromise
+        if (refreshed) {
           config._retry = true
-          config.headers.Authorization = `Bearer ${newToken}`
           return instance(config)
         }
       } finally {
@@ -101,12 +93,4 @@ export const request = {
     instance.patch<T>(url, data, config).then((response) => response.data),
   delete: <T = void>(url: string, config?: AxiosRequestConfig): Promise<T> =>
     instance.delete<T>(url, config).then((response) => response.data),
-}
-
-export function setAuthToken(token: string | null): void {
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token)
-  } else {
-    localStorage.removeItem(TOKEN_KEY)
-  }
 }

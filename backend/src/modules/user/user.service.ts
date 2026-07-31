@@ -5,7 +5,7 @@ import { logger } from "@/shared/logger/index.js";
 import type { User } from "@/shared/database/schema/types.js";
 import { PASSWORD_SENTINEL } from "./user.constants.js";
 import { userRepository } from "./user.repository.js";
-import type { AuthResponse, LoginInput, UserDto } from "./user.types.js";
+import type { AuthResult, LoginInput, UserDto } from "./user.types.js";
 
 export function toUserDto(user: User): UserDto {
   return {
@@ -18,7 +18,7 @@ export function toUserDto(user: User): UserDto {
   };
 }
 
-export async function loginWithFirebase(input: LoginInput): Promise<AuthResponse> {
+export async function loginWithFirebase(input: LoginInput): Promise<AuthResult> {
   const decoded = await verifyFirebaseIdToken(input.idToken);
 
   const email = decoded.email ?? null;
