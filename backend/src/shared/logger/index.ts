@@ -2,7 +2,9 @@ import winston from "winston";
 import "dotenv/config";
 
 const isProduction = process.env.NODE_ENV === "production";
-const level = (process.env.LOG_LEVEL || (isProduction ? "info" : "debug")).toLowerCase();
+const level = (
+  process.env.LOG_LEVEL || (isProduction ? "info" : "debug")
+).toLowerCase();
 const logDir = process.env.LOG_DIR || "logs";
 
 const { combine, timestamp, printf, colorize, errors, json } = winston.format;

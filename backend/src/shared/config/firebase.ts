@@ -13,33 +13,31 @@ type ServiceAccount = {
 let authInstance: Auth | undefined;
 
 function loadServiceAccount(): ServiceAccount | null {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw || !raw.trim()) return null;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(raw) as Record<string, unknown>;
-  } catch (error) {
-    throw new Error(
-      `FIREBASE_SERVICE_ACCOUNT is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  if (!projectId && !clientEmail && !privateKeyRaw) return null;
+
+  if (!projectId || !clientEmail || !privateKeyRaw) {
+    const missing = [
+      !projectId ? "FIREBASE_PROJECT_ID" : null,
+      !clientEmail ? "FIREBASE_CLIENT_EMAIL" : null,
+      !privateKeyRaw ? "FIREBASE_PRIVATE_KEY" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    throw new Error(`Firebase is missing required env vars: ${missing}`);
   }
 
-  const { project_id, client_email, private_key } = parsed;
-  if (!project_id || !client_email || !private_key) {
-    throw new Error(
-      "FIREBASE_SERVICE_ACCOUNT is missing required fields (project_id, client_email, private_key)",
-    );
-  }
-
-  const privateKey = String(private_key).includes("\\n")
-    ? String(private_key).replaceAll("\\n", "\n")
-    : String(private_key);
+  const privateKey = privateKeyRaw.includes("\\n")
+    ? privateKeyRaw.replaceAll("\\n", "\n")
+    : privateKeyRaw;
 
   return {
     type: "service_account",
-    projectId: String(project_id),
-    clientEmail: String(client_email),
+    projectId,
+    clientEmail,
     privateKey,
   };
 }
@@ -50,7 +48,7 @@ function getFirebaseAuth(): Auth {
       const serviceAccount = loadServiceAccount();
       if (!serviceAccount) {
         throw new ServerError(
-          "Firebase is not configured: FIREBASE_SERVICE_ACCOUNT is missing",
+          "Firebase is not configured: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY are missing",
           503,
         );
       }
