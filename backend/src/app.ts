@@ -22,6 +22,7 @@ import { billingRouter } from "@/modules/billing/index.js";
 import { medicineRouter } from "@/modules/medicine/index.js";
 import { prescriptionRouter } from "@/modules/prescription/index.js";
 import { bedRouter } from "@/modules/bed/index.js";
+import { aiAgentRouter } from "@/modules/ai-agent/index.js";
 
 const parsedPort = Number(process.env.PORT);
 const PORT =
@@ -60,6 +61,7 @@ app.use(
   medicineRouter,
   prescriptionRouter,
   bedRouter,
+  aiAgentRouter,
 );
 
 app.use(notFound);
