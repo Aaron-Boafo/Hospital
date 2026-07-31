@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppointments, usePatients, useDoctors, useCreateAppointment, useUpdateAppointment, useUpdateAppointmentStatus, useDeleteAppointment } from '../hooks';
 import {
   FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiCalendar, FiCheck, FiXCircle,
@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 import { DAYS, MONTHS } from '../constants';
+import { notify } from '../lib/notify';
 
 const INITIAL_FORM = { patientId: '', doctorId: '', date: '', time: '', notes: '' };
 
@@ -165,6 +166,11 @@ export default function Appointments() {
   const updateMutation = useUpdateAppointment();
   const statusMutation = useUpdateAppointmentStatus();
   const deleteMutation = useDeleteAppointment();
+
+  useEffect(() => {
+    if (error) notify.retry('Failed to load appointments', () => refetch());
+  }, [error, refetch]);
+
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
   const [statusFilter, setStatusFilter] = useState('All');
@@ -220,21 +226,35 @@ export default function Appointments() {
     if (!form.patientId || !form.doctorId || !form.date || !form.time) return;
     const input = { patientId: form.patientId, doctorId: form.doctorId, date: form.date, time: form.time, notes: form.notes || undefined };
     if (editing) {
-      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+      notify.promise(updateMutation.mutateAsync({ id: editing, input }), {
+        loading: 'Updating appointment...',
+        success: 'Appointment updated successfully',
+      }).then(ok => { if (ok) closeModal(); });
     } else {
-      createMutation.mutate(input, { onSuccess: closeModal });
+      notify.promise(createMutation.mutateAsync(input), {
+        loading: 'Scheduling appointment...',
+        success: 'Appointment scheduled successfully',
+      }).then(ok => { if (ok) closeModal(); });
     }
   };
 
   const handleStatusChange = (id, status) => {
-    statusMutation.mutate({ id, status });
+    const completed = status === 'COMPLETED';
+    notify.promise(statusMutation.mutateAsync({ id, status }), {
+      loading: completed ? 'Completing appointment...' : 'Cancelling appointment...',
+      success: completed ? 'Appointment completed' : 'Appointment cancelled',
+    });
   };
 
   const handleDeleteApt = (id) => {
-    if (confirm('Delete this appointment?')) deleteMutation.mutate(id);
+    if (confirm('Delete this appointment?')) {
+      notify.promise(deleteMutation.mutateAsync(id), {
+        loading: 'Deleting appointment...',
+        success: 'Appointment deleted',
+      });
+    }
   };
 
-  const submitError = editing ? updateMutation.error : createMutation.error;
   const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   return (
@@ -242,12 +262,6 @@ export default function Appointments() {
       <PageHeader title="Appointments" />
 
       <div className="page-body fade-in">
-        {error && (
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            <span>Failed to load appointments: {error.message}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input
@@ -374,11 +388,6 @@ export default function Appointments() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {submitError && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {submitError.message}
-                  </div>
-                )}
                 <div className="form-group">
                   <label>Patient *</label>
                   <select className="form-control" value={form.patientId} onChange={handlePatientChange} required>

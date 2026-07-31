@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 import { URGENCY_STYLES } from '../constants';
+import { notify } from '../lib/notify';
 
 function parseAIResponse(text) {
   const sections = { diagnoses: [], tests: [], treatments: [], urgency: 'Routine', raw: text };
@@ -48,21 +49,20 @@ export default function DecisionSupport() {
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
-  const [error, setError] = useState('');
   const [history, setHistory] = useState([]);
+  const [now] = useState(() => Date.now());
 
   const selectedPatient = patients.find(p => p.id === patientId);
 
   const getAge = (dob) => {
     if (!dob) return 'Unknown';
-    const diff = Date.now() - new Date(dob).getTime();
+    const diff = now - new Date(dob).getTime();
     return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
   };
 
   const handleAnalyze = async () => {
     if (!symptoms.trim()) return;
     setLoading(true);
-    setError('');
     setResults(null);
 
     const patientContext = selectedPatient
@@ -91,7 +91,7 @@ export default function DecisionSupport() {
 
 Important: Be thorough but concise. Always consider the most serious possibilities first.`;
 
-    try {
+    const runAnalysis = async () => {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,11 +124,14 @@ Important: Be thorough but concise. Always consider the most serious possibiliti
         urgency: parsed.urgency,
         time: 'Just now',
       }, ...prev].slice(0, 10));
-    } catch (err) {
-      setError(err.message || 'Failed to analyze symptoms. Please check your API configuration.');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    await notify.promise(runAnalysis(), {
+      loading: 'Analyzing symptoms...',
+      success: 'Analysis complete',
+      error: 'Failed to analyze symptoms. Please check your API configuration.',
+    });
+    setLoading(false);
   };
 
   return (
@@ -224,24 +227,12 @@ Important: Be thorough but concise. Always consider the most serious possibiliti
                   {loading ? 'Analyzing...' : 'Analyze Symptoms'}
                 </button>
                 {symptoms && (
-                  <button className="btn btn-ghost" onClick={() => { setSymptoms(''); setResults(null); setError(''); }}>
+                  <button className="btn btn-ghost" onClick={() => { setSymptoms(''); setResults(null); }}>
                     Clear
                   </button>
                 )}
               </div>
             </div>
-
-            {error && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                backgroundColor: 'var(--color-danger-bg)',
-                color: 'var(--color-danger)',
-                padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                fontSize: '0.88rem', fontWeight: 500,
-              }}>
-                <FiAlertTriangle /> {error}
-              </div>
-            )}
 
             {results && (
               <>
@@ -323,7 +314,7 @@ Important: Be thorough but concise. Always consider the most serious possibiliti
               </>
             )}
 
-            {!results && !loading && !error && (
+            {!results && !loading && (
               <div className="card" style={{ textAlign: 'center', padding: '60px 24px' }}>
                 <FiFileText style={{ fontSize: '3rem', color: 'var(--color-border)', marginBottom: 16 }} />
                 <h3 style={{ color: 'var(--color-text-secondary)', fontSize: '1.1rem', marginBottom: 8 }}>No Analysis Yet</h3>

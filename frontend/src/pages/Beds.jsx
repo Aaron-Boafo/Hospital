@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 import { BED_STATUS_STYLES } from '../constants';
+import { notify } from '../lib/notify';
 
 export default function Beds() {
   const { wards, beds, admitPatient, dischargePatient, addWard, removeWard, updateWard, addBed, removeBed } = useData();
@@ -60,6 +61,7 @@ export default function Beds() {
     if (!selectedPatient || !admittingBed) return;
     const patient = patients.find(p => p.id === selectedPatient);
     admitPatient(admittingBed.id, patient.id, patient.name);
+    notify.success(`${patient.name} admitted to ${admittingBed.id}`);
     setAdmittingBed(null);
     setSelectedPatient('');
   };
@@ -98,8 +100,10 @@ export default function Beds() {
         setManageError(result.error);
         return;
       }
+      notify.success('Ward updated successfully');
     } else {
       addWard(manageForm.name.trim(), manageForm.totalBeds);
+      notify.success('Ward added successfully');
     }
     setManageView('list');
   };
@@ -110,16 +114,18 @@ export default function Beds() {
       setManageError(result.error);
       return;
     }
+    notify.success('Ward deleted');
   };
 
   const handleAddBed = (wardId) => {
     addBed(wardId);
+    notify.success('Bed added');
   };
 
   const handleRemoveBed = (bedId) => {
     const result = removeBed(bedId);
     if (!result.success) {
-      alert(result.error);
+      notify.error(result.error);
     }
   };
 
@@ -193,7 +199,7 @@ export default function Beds() {
                     <div key={b.id}
                       onClick={() => {
                         if (b.status === 'Available') setAdmittingBed(admittingBed?.id === b.id ? null : b);
-                        else if (b.status === 'Occupied' && confirm(`Discharge ${b.patientName} from ${b.id}?`)) dischargePatient(b.id);
+                        else if (b.status === 'Occupied' && confirm(`Discharge ${b.patientName} from ${b.id}?`)) { dischargePatient(b.id); notify.success(`${b.patientName} discharged from ${b.id}`); }
                       }}
                       style={{
                         padding: '14px 10px', borderRadius: 'var(--radius-md)',

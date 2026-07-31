@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMedicines, useCreateMedicine, useUpdateMedicine, useDeleteMedicine } from '../hooks';
 import { MEDICINE_CATEGORIES } from '../constants';
 import {
@@ -6,6 +6,7 @@ import {
   FiAlertTriangle, FiClock, FiDollarSign
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { notify } from '../lib/notify';
 
 const INITIAL_FORM = { name: '', category: MEDICINE_CATEGORIES[0], unitPrice: '', quantity: '', reorderLevel: '', expiryDate: '', supplier: '' };
 
@@ -16,6 +17,11 @@ export default function Pharmacy() {
   const createMutation = useCreateMedicine();
   const updateMutation = useUpdateMedicine();
   const deleteMutation = useDeleteMedicine();
+
+  useEffect(() => {
+    if (error) notify.retry('Failed to load medicines', () => refetch());
+  }, [error, refetch]);
+
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -58,17 +64,27 @@ export default function Pharmacy() {
       supplier: form.supplier || undefined,
     };
     if (editing) {
-      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+      notify.promise(updateMutation.mutateAsync({ id: editing, input }), {
+        loading: 'Updating medicine...',
+        success: 'Medicine updated successfully',
+      }).then(ok => { if (ok) closeModal(); });
     } else {
-      createMutation.mutate(input, { onSuccess: closeModal });
+      notify.promise(createMutation.mutateAsync(input), {
+        loading: 'Adding medicine...',
+        success: 'Medicine added successfully',
+      }).then(ok => { if (ok) closeModal(); });
     }
   };
 
   const handleDelete = (id) => {
-    if (confirm('Delete this medicine?')) deleteMutation.mutate(id);
+    if (confirm('Delete this medicine?')) {
+      notify.promise(deleteMutation.mutateAsync(id), {
+        loading: 'Deleting medicine...',
+        success: 'Medicine deleted',
+      });
+    }
   };
 
-  const submitError = editing ? updateMutation.error : createMutation.error;
   const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   return (
@@ -76,12 +92,6 @@ export default function Pharmacy() {
       <PageHeader title="Pharmacy" subtitle="Medicine catalog and inventory management" />
 
       <div className="page-body fade-in">
-        {error && (
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            <span>Failed to load medicines: {error.message}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 180 }} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
@@ -156,11 +166,6 @@ export default function Pharmacy() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {submitError && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {submitError.message}
-                  </div>
-                )}
                 <div className="form-group">
                   <label>Medicine Name *</label>
                   <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Amoxicillin 500mg" required />

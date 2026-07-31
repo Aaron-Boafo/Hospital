@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 import { PERIODS } from '../constants';
+import { notify } from '../lib/notify';
 
 function getRange(period) {
   const now = new Date();
@@ -177,6 +178,7 @@ export default function Reports() {
     link.download = `report-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    notify.success('Report exported successfully');
   };
 
   return (

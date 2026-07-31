@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDoctors, useCreateDoctor, useUpdateDoctor, useToggleDoctorActive } from '../hooks';
 import { DEPARTMENTS } from '../constants';
 import { FiSearch, FiPlus, FiEdit2, FiX, FiUserPlus, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { notify } from '../lib/notify';
 
 const INITIAL_FORM = { name: '', department: DEPARTMENTS[0], phone: '', email: '' };
 
@@ -13,6 +14,11 @@ export default function Doctors() {
   const createMutation = useCreateDoctor();
   const updateMutation = useUpdateDoctor();
   const toggleMutation = useToggleDoctorActive();
+
+  useEffect(() => {
+    if (error) notify.retry('Failed to load doctors', () => refetch());
+  }, [error, refetch]);
+
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -53,15 +59,20 @@ export default function Doctors() {
       email: form.email || undefined,
     };
     if (editing) {
-      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+      notify.promise(updateMutation.mutateAsync({ id: editing, input }), {
+        loading: 'Updating doctor...',
+        success: 'Doctor updated successfully',
+      }).then(ok => { if (ok) closeModal(); });
     } else {
-      createMutation.mutate(input, { onSuccess: closeModal });
+      notify.promise(createMutation.mutateAsync(input), {
+        loading: 'Adding doctor...',
+        success: 'Doctor added successfully',
+      }).then(ok => { if (ok) closeModal(); });
     }
   };
 
   const allDepartments = [...new Set(doctors.map(d => d.department))];
 
-  const submitError = editing ? updateMutation.error : createMutation.error;
   const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   return (
@@ -69,12 +80,6 @@ export default function Doctors() {
       <PageHeader title="Doctors" />
 
       <div className="page-body fade-in">
-        {error && (
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            <span>Failed to load doctors: {error.message}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 180 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
@@ -140,7 +145,10 @@ export default function Doctors() {
                   </button>
                   <button
                     className={`btn btn-sm ${d.active ? 'btn-danger' : 'btn-success'}`}
-                    onClick={() => toggleMutation.mutate({ id: d.id, active: !d.active })}
+                    onClick={() => notify.promise(toggleMutation.mutateAsync({ id: d.id, active: !d.active }), {
+                      loading: d.active ? 'Deactivating doctor...' : 'Activating doctor...',
+                      success: d.active ? 'Doctor deactivated' : 'Doctor activated',
+                    })}
                   >
                     {d.active ? <><FiToggleLeft /> Deactivate</> : <><FiToggleRight /> Activate</>}
                   </button>
@@ -160,11 +168,6 @@ export default function Doctors() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {submitError && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {submitError.message}
-                  </div>
-                )}
                 <div className="form-group">
                   <label>Full Name *</label>
                   <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Dr. Jane Smith" required />

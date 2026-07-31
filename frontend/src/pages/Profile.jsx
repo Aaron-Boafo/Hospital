@@ -6,14 +6,13 @@ import {
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 import { PROFILE_TABS } from '../constants';
+import { notify } from '../lib/notify';
 
 export default function Profile() {
   const { user, changePassword } = useAuth();
   const [activeTab, setActiveTab] = useState('personal');
   const [editing, setEditing] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [avatar, setAvatar] = useState(null);
-  const [passwordSaved, setPasswordSaved] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
   const [formData, setFormData] = useState({
@@ -33,15 +32,13 @@ export default function Profile() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setSaved(true);
+    notify.success('Profile details updated successfully');
     setEditing(false);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setPasswordError('');
-    setPasswordSaved(false);
 
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       setPasswordError('Please fill in all password fields');
@@ -60,14 +57,11 @@ export default function Profile() {
       return;
     }
 
-    try {
-      await changePassword(passwordData.currentPassword, passwordData.newPassword);
-      setPasswordSaved(true);
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setTimeout(() => setPasswordSaved(false), 3000);
-    } catch (err) {
-      setPasswordError(err?.message || 'Could not update password');
-    }
+    const ok = await notify.promise(changePassword(passwordData.currentPassword, passwordData.newPassword), {
+      loading: 'Updating password...',
+      success: 'Password updated successfully',
+    });
+    if (ok) setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 
   const handleCancel = () => {
@@ -186,18 +180,6 @@ export default function Profile() {
             <div style={{ paddingTop: 24 }}>
               {activeTab === 'personal' && (
                 <div className="settings-section">
-                  {saved && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      backgroundColor: 'var(--color-success-bg)',
-                      color: 'var(--color-success)',
-                      padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                      marginBottom: 20, fontSize: '0.9rem', fontWeight: 500,
-                    }}>
-                      <FiCheck /> Profile details updated successfully!
-                    </div>
-                  )}
-
                   {!editing ? (
                     <div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, marginBottom: 8 }}>
@@ -297,18 +279,6 @@ export default function Profile() {
 
               {activeTab === 'security' && (
                 <div className="settings-section">
-                  {passwordSaved && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      backgroundColor: 'var(--color-success-bg)',
-                      color: 'var(--color-success)',
-                      padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                      marginBottom: 20, fontSize: '0.9rem', fontWeight: 500,
-                    }}>
-                      <FiCheck /> Password updated successfully!
-                    </div>
-                  )}
-
                   {passwordError && (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 8,

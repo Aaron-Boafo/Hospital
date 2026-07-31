@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePatients, useAppointments, useCreatePatient, useUpdatePatient, useDeletePatient } from '../hooks';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiEye, FiX, FiUser } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { notify } from '../lib/notify';
 
 const INITIAL_FORM = { name: '', dob: '', gender: 'MALE', phone: '', address: '', emergencyContact: '' };
 
@@ -25,6 +26,11 @@ export default function Patients() {
   const createMutation = useCreatePatient();
   const updateMutation = useUpdatePatient();
   const deleteMutation = useDeletePatient();
+
+  useEffect(() => {
+    if (error) notify.retry('Failed to load patients', () => refetch());
+  }, [error, refetch]);
+
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
@@ -60,15 +66,24 @@ export default function Patients() {
       emergencyContact: form.emergencyContact || undefined,
     };
     if (editing) {
-      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+      notify.promise(updateMutation.mutateAsync({ id: editing, input }), {
+        loading: 'Updating patient...',
+        success: 'Patient updated successfully',
+      }).then(ok => { if (ok) closeModal(); });
     } else {
-      createMutation.mutate(input, { onSuccess: closeModal });
+      notify.promise(createMutation.mutateAsync(input), {
+        loading: 'Registering patient...',
+        success: 'Patient registered successfully',
+      }).then(ok => { if (ok) closeModal(); });
     }
   };
 
   const handleDelete = (id) => {
     if (confirm('Are you sure you want to delete this patient?')) {
-      deleteMutation.mutate(id, { onSuccess: () => { if (viewing?.id === id) setViewing(null); } });
+      notify.promise(deleteMutation.mutateAsync(id), {
+        loading: 'Deleting patient...',
+        success: 'Patient deleted',
+      }).then(ok => { if (ok && viewing?.id === id) setViewing(null); });
     }
   };
 
@@ -82,7 +97,6 @@ export default function Patients() {
     return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000)) + ' yrs';
   };
 
-  const submitError = editing ? updateMutation.error : createMutation.error;
   const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   // Detail view
@@ -188,12 +202,6 @@ export default function Patients() {
       <PageHeader title="Patients" />
 
       <div className="page-body fade-in">
-        {error && (
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            <span>Failed to load patients: {error.message}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{patients.length} patients</span>
@@ -277,11 +285,6 @@ export default function Patients() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {submitError && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {submitError.message}
-                  </div>
-                )}
                 <div className="form-group">
                   <label>Full Name *</label>
                   <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Enter full name" required />

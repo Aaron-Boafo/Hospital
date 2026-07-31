@@ -7,6 +7,7 @@ import {
   FiAlertCircle, FiActivity, FiFileText
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { notify } from '../lib/notify';
 
 export default function Lab() {
   const { labTests, labResults, orderLabTest, submitLabResult } = useData();
@@ -42,6 +43,7 @@ export default function Lab() {
     e.preventDefault();
     if (!orderForm.patientId || !orderForm.testType) return;
     orderLabTest(orderForm);
+    notify.success('Lab test ordered successfully');
     setShowOrderModal(false);
   };
 
@@ -49,6 +51,7 @@ export default function Lab() {
     e.preventDefault();
     if (!resultData.results) return;
     submitLabResult(showResultModal.id, resultData.results, resultData.notes);
+    notify.success('Lab result submitted');
     setShowResultModal(null);
     setResultData({ results: '', notes: '' });
   };

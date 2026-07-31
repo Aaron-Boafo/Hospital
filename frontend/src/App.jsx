@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import CookieConsent from './components/CookieConsent';
+import AppToaster from './components/AppToaster';
 import DashboardLayout from './components/DashboardLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -74,6 +75,7 @@ export default function App() {
             </Route>
           </Routes>
           <CookieConsent />
+          <AppToaster />
         </ThemeProvider>
         </DataProvider>
       </AuthProvider>

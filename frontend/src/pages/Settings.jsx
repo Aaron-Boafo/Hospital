@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import PageHeader from '../components/PageHeader';
 import { TABS, THEME_OPTIONS, LANGUAGE_OPTIONS, DATE_FORMAT_OPTIONS } from '../constants';
+import { notify } from '../lib/notify';
 
 export default function Settings() {
   const { data: activities = [], isLoading: activitiesLoading } = useActivities();
@@ -23,9 +24,6 @@ export default function Settings() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('general');
-  const [saved, setSaved] = useState(false);
-  const [backupMsg, setBackupMsg] = useState('');
-  const [cacheMsg, setCacheMsg] = useState('');
 
   const [settings, setSettings] = useState({
     language: 'en',
@@ -51,15 +49,13 @@ export default function Settings() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    notify.success('Settings updated successfully');
   };
 
   const handleBackupNow = () => {
     const snapshot = { patients, doctors, appointments, bills, backedUpAt: new Date().toISOString() };
     localStorage.setItem('hms_backup', JSON.stringify(snapshot));
-    setBackupMsg('Backup saved at ' + new Date().toLocaleTimeString());
-    setTimeout(() => setBackupMsg(''), 4000);
+    notify.success('Backup saved at ' + new Date().toLocaleTimeString());
   };
 
   const handleExportData = () => {
@@ -71,8 +67,7 @@ export default function Settings() {
     link.download = `medicare-export-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setCacheMsg('Data exported successfully!');
-    setTimeout(() => setCacheMsg(''), 4000);
+    notify.success('Data exported successfully');
   };
 
   const handleClearCache = () => {
@@ -83,7 +78,7 @@ export default function Settings() {
     localStorage.removeItem('hms_data_v2');
     localStorage.removeItem('hms_settings');
     localStorage.removeItem('hms_backup');
-    setCacheMsg('Cache cleared! Reloading...');
+    notify.success('Cache cleared. Reloading...');
     setTimeout(() => window.location.reload(), 1500);
   };
 
@@ -252,7 +247,6 @@ export default function Settings() {
               <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={handleBackupNow}>
                 <FiHardDrive /> Backup Now
               </button>
-              {backupMsg && <span style={{ fontSize: '0.82rem', color: 'var(--color-success)', fontWeight: 500 }}>{backupMsg}</span>}
             </div>
 
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 24 }}>
@@ -358,17 +352,6 @@ export default function Settings() {
                 </button>
               </div>
 
-              {cacheMsg && (
-                <div style={{
-                  marginTop: 12, display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '10px 14px', borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-success-bg)', color: 'var(--color-success)',
-                  fontSize: '0.85rem', fontWeight: 500,
-                }}>
-                  <FiCheck /> {cacheMsg}
-                </div>
-              )}
-
               <div style={{
                 marginTop: 20, padding: '14px 16px',
                 borderRadius: 'var(--radius-md)',
@@ -397,18 +380,6 @@ export default function Settings() {
 
       <div className="page-body fade-in">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {saved && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              backgroundColor: 'var(--color-success-bg)',
-              color: 'var(--color-success)',
-              padding: '12px 16px', borderRadius: 'var(--radius-md)',
-              fontSize: '0.9rem', fontWeight: 500, width: 'fit-content',
-            }}>
-              <FiCheck /> Settings updated successfully!
-            </div>
-          )}
-
           <div className="tabs" style={{ marginBottom: 0 }}>
             {visibleTabs.map(tab => (
               <button

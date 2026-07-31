@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useBills, usePatients, useCreateBill, useRecordPayment } from '../hooks';
 import { PAYMENT_METHODS } from '../constants';
 import { FiSearch, FiPlus, FiX, FiDollarSign, FiPrinter, FiTrash2, FiCreditCard } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { notify } from '../lib/notify';
 
 const INITIAL_FORM = { patientId: '', items: [{ description: '', amount: '' }] };
 
@@ -13,6 +14,11 @@ export default function Billing() {
   const { data: patients = [] } = usePatients();
   const createMutation = useCreateBill();
   const payMutation = useRecordPayment();
+
+  useEffect(() => {
+    if (error) notify.retry('Failed to load bills', () => refetch());
+  }, [error, refetch]);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -55,11 +61,14 @@ export default function Billing() {
     e.preventDefault();
     if (!form.patientId || form.items.some(it => !it.description || !it.amount)) return;
     const items = form.items.map(it => ({ description: it.description, amount: parseFloat(it.amount) }));
-    createMutation.mutate({ patientId: form.patientId, items }, {
-      onSuccess: () => {
+    notify.promise(createMutation.mutateAsync({ patientId: form.patientId, items }), {
+      loading: 'Creating bill...',
+      success: 'Bill created successfully',
+    }).then(ok => {
+      if (ok) {
         setShowCreateModal(false);
         setForm(INITIAL_FORM);
-      },
+      }
     });
   };
 
@@ -67,12 +76,15 @@ export default function Billing() {
     e.preventDefault();
     const amt = parseFloat(payAmount);
     if (!amt || amt <= 0) return;
-    payMutation.mutate({ billId: showPayModal.id, input: { amount: amt, method: payMethod } }, {
-      onSuccess: () => {
+    notify.promise(payMutation.mutateAsync({ billId: showPayModal.id, input: { amount: amt, method: payMethod } }), {
+      loading: 'Recording payment...',
+      success: 'Payment recorded',
+    }).then(ok => {
+      if (ok) {
         setShowPayModal(null);
         setPayAmount('');
         setPayMethod(PAYMENT_METHODS[0]);
-      },
+      }
     });
   };
 
@@ -141,12 +153,6 @@ export default function Billing() {
       <PageHeader title="Billing & Payments" />
 
       <div className="page-body fade-in">
-        {error && (
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            <span>Failed to load bills: {error.message}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 150 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -238,11 +244,6 @@ export default function Billing() {
             </div>
             <form onSubmit={handleCreateBill}>
               <div className="modal-body">
-                {createMutation.error && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {createMutation.error.message}
-                  </div>
-                )}
                 <div className="form-group">
                   <label>Patient *</label>
                   <select className="form-control" value={form.patientId} onChange={handlePatientChange} required>
@@ -318,11 +319,6 @@ export default function Billing() {
             </div>
             <form onSubmit={handlePay}>
               <div className="modal-body">
-                {payMutation.error && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {payMutation.error.message}
-                  </div>
-                )}
                 <p className="text-muted" style={{ marginBottom: 16 }}>
                   Bill <strong>{showPayModal.id}</strong> for <strong>{showPayModal.patient.name}</strong><br />
                   Balance due: <strong style={{ color: 'var(--color-danger)' }}>GH₵{(showPayModal.total - showPayModal.paid).toFixed(2)}</strong>

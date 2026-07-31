@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePrescriptions, usePatients, useMedicines, useCreatePrescription, useDispensePrescription } from '../hooks';
 import {
   FiSearch, FiPlus, FiX, FiCheckCircle, FiClock, FiUser,
   FiPackage, FiDollarSign, FiAlertCircle, FiTrash2
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { notify } from '../lib/notify';
 
 const EMPTY_ITEM = { medicineId: '', dosage: '', frequency: '', duration: '', quantity: 1 };
 
@@ -16,6 +17,11 @@ export default function Prescriptions() {
   const { data: medicines = [] } = useMedicines();
   const createMutation = useCreatePrescription();
   const dispenseMutation = useDispensePrescription();
+
+  useEffect(() => {
+    if (error) notify.retry('Failed to load prescriptions', () => refetch());
+  }, [error, refetch]);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -54,7 +60,7 @@ export default function Prescriptions() {
   const handleCreate = (e) => {
     e.preventDefault();
     if (!formPatientId || prxItems.some(i => !i.medicineId || !i.dosage)) return;
-    createMutation.mutate({
+    notify.promise(createMutation.mutateAsync({
       patientId: formPatientId,
       doctorName: formDoctor || undefined,
       items: prxItems.map(i => ({
@@ -64,19 +70,25 @@ export default function Prescriptions() {
         frequency: i.frequency || undefined,
         duration: i.duration || undefined,
       })),
-    }, {
-      onSuccess: () => {
+    }), {
+      loading: 'Creating prescription...',
+      success: 'Prescription created successfully',
+    }).then(ok => {
+      if (ok) {
         setShowCreateModal(false);
         setFormPatientId('');
         setFormDoctor('');
         setPrxItems([EMPTY_ITEM]);
-      },
+      }
     });
   };
 
   const handleDispense = (id) => {
     if (confirm('Dispense this prescription? Stock will be deducted and a bill will be created.')) {
-      dispenseMutation.mutate(id);
+      notify.promise(dispenseMutation.mutateAsync(id), {
+        loading: 'Dispensing prescription...',
+        success: 'Prescription dispensed',
+      });
     }
   };
 
@@ -87,12 +99,6 @@ export default function Prescriptions() {
       <PageHeader title="Prescriptions" subtitle="Create and dispense medication prescriptions" />
 
       <div className="page-body fade-in">
-        {error && (
-          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            <span>Failed to load prescriptions: {error.message}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
-          </div>
-        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 160 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -186,11 +192,6 @@ export default function Prescriptions() {
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">
-                {createMutation.error && (
-                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
-                    {createMutation.error.message}
-                  </div>
-                )}
                 <div className="form-row">
                   <div className="form-group">
                     <label>Patient *</label>

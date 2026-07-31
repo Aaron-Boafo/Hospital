@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FiZap, FiMail, FiLock, FiArrowLeft, FiCheck, FiAlertTriangle, FiAlertCircle } from 'react-icons/fi';
+import { notify } from '../lib/notify';
 
 export default function Login() {
   const { login, loginWithGoogle, resetPassword, user, authError } = useAuth();
@@ -23,22 +24,20 @@ export default function Login() {
       setError('Please enter both email and password');
       return;
     }
-    try {
-      await login(email, password);
-      navigate('/');
-    } catch (err) {
-      setError(err.message);
-    }
+    const ok = await notify.promise(login(email, password), {
+      loading: 'Signing in...',
+      success: 'Welcome back!',
+    });
+    if (ok) navigate('/');
   };
 
   const handleGoogle = async () => {
     setError('');
-    try {
-      await loginWithGoogle();
-      navigate('/');
-    } catch (err) {
-      setError(err.message);
-    }
+    const ok = await notify.promise(loginWithGoogle(), {
+      loading: 'Signing in with Google...',
+      success: 'Welcome back!',
+    });
+    if (ok) navigate('/');
   };
 
   const handleReset = async (e) => {
@@ -49,12 +48,11 @@ export default function Login() {
       setResetError('Please enter your email address');
       return;
     }
-    try {
-      await resetPassword(resetEmail);
-      setResetSent(true);
-    } catch (err) {
-      setResetError(err.message);
-    }
+    const ok = await notify.promise(resetPassword(resetEmail), {
+      loading: 'Sending reset link...',
+      success: 'Password reset link sent',
+    });
+    if (ok) setResetSent(true);
   };
 
   return (
