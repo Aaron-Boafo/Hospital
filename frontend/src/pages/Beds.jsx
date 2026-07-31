@@ -1,17 +1,27 @@
 import { useState, useMemo } from 'react';
-import { useData } from '../context/DataContext';
-import { usePatients } from '../hooks';
+import {
+  useWards, useBeds, usePatients,
+  useCreateWard, useUpdateWard, useDeleteWard,
+  useCreateBed, useAdmitToBed, useDischargeFromBed,
+} from '../hooks';
 import {
   FiGrid, FiUser, FiX, FiCheck, FiAlertCircle, FiHome,
   FiPlus, FiSearch, FiSettings, FiTrash2, FiEdit2, FiSave
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 import { BED_STATUS_STYLES } from '../constants';
-import { notify } from '../lib/notify';
+import { notify, errorMessage } from '../lib/notify';
 
 export default function Beds() {
-  const { wards, beds, admitPatient, dischargePatient, addWard, removeWard, updateWard, addBed, removeBed } = useData();
+  const { data: wards = [] } = useWards();
+  const { data: beds = [] } = useBeds();
   const { data: patients = [], isLoading: patientsLoading } = usePatients();
+  const createWardMutation = useCreateWard();
+  const updateWardMutation = useUpdateWard();
+  const deleteWardMutation = useDeleteWard();
+  const createBedMutation = useCreateBed();
+  const admitMutation = useAdmitToBed();
+  const dischargeMutation = useDischargeFromBed();
   const [search, setSearch] = useState('');
   const [wardFilter, setWardFilter] = useState('All');
 
@@ -27,8 +37,8 @@ export default function Beds() {
   const [selectedPatient, setSelectedPatient] = useState('');
 
   const filteredBeds = beds.filter(b => {
-    const matchSearch = b.id.toLowerCase().includes(search.toLowerCase()) ||
-      (b.patientName || '').toLowerCase().includes(search.toLowerCase());
+    const matchSearch = String(b.number).includes(search.trim()) ||
+      (b.patient?.name || '').toLowerCase().includes(search.toLowerCase());
     const matchWard = wardFilter === 'All' || b.wardId === wardFilter;
     return matchSearch && matchWard;
   });
@@ -48,9 +58,9 @@ export default function Beds() {
       const wardBeds = beds.filter(b => b.wardId === w.id);
       stats[w.id] = {
         total: wardBeds.length,
-        occupied: wardBeds.filter(b => b.status === 'Occupied').length,
-        available: wardBeds.filter(b => b.status === 'Available').length,
-        maintenance: wardBeds.filter(b => b.status === 'Maintenance').length,
+        occupied: wardBeds.filter(b => b.status === 'OCCUPIED').length,
+        available: wardBeds.filter(b => b.status === 'AVAILABLE').length,
+        maintenance: wardBeds.filter(b => b.status === 'MAINTENANCE').length,
       };
     });
     return stats;
@@ -60,8 +70,13 @@ export default function Beds() {
     e.preventDefault();
     if (!selectedPatient || !admittingBed) return;
     const patient = patients.find(p => p.id === selectedPatient);
-    admitPatient(admittingBed.id, patient.id, patient.name);
-    notify.success(`${patient.name} admitted to ${admittingBed.id}`);
+    notify.promise(
+      admitMutation.mutateAsync({ bedId: admittingBed.id, input: { patientId: patient.id } }),
+      {
+        loading: `Admitting ${patient.name}...`,
+        success: `${patient.name} admitted to Bed ${admittingBed.number}`,
+      },
+    );
     setAdmittingBed(null);
     setSelectedPatient('');
   };
@@ -94,44 +109,40 @@ export default function Beds() {
       return;
     }
 
+    const input = { name: manageForm.name.trim(), totalBeds: parseInt(manageForm.totalBeds) };
     if (editingWard) {
-      const result = updateWard(editingWard.id, manageForm);
-      if (!result.success) {
-        setManageError(result.error);
-        return;
-      }
-      notify.success('Ward updated successfully');
+      notify.promise(
+        updateWardMutation.mutateAsync({ id: editingWard.id, input }),
+        { loading: 'Updating ward...', success: 'Ward updated successfully' },
+      );
     } else {
-      addWard(manageForm.name.trim(), manageForm.totalBeds);
-      notify.success('Ward added successfully');
+      notify.promise(
+        createWardMutation.mutateAsync(input),
+        { loading: 'Creating ward...', success: 'Ward added successfully' },
+      );
     }
     setManageView('list');
   };
 
-  const handleDeleteWard = (wardId) => {
-    const result = removeWard(wardId);
-    if (!result.success) {
-      setManageError(result.error);
-      return;
-    }
-    notify.success('Ward deleted');
-  };
-
   const handleAddBed = (wardId) => {
-    addBed(wardId);
-    notify.success('Bed added');
+    const nextNumber = (wardTotals[wardId]?.total || 0) + 1;
+    notify.promise(
+      createBedMutation.mutateAsync({ wardId, number: nextNumber }),
+      { loading: 'Adding bed...', success: `Bed ${nextNumber} added` },
+    );
   };
 
-  const handleRemoveBed = (bedId) => {
-    const result = removeBed(bedId);
-    if (!result.success) {
-      notify.error(result.error);
-    }
+  const handleDischarge = (bed) => {
+    notify.promise(
+      dischargeMutation.mutateAsync(bed.id),
+      {
+        loading: 'Discharging...',
+        success: `${bed.patient?.name || 'Patient'} discharged from Bed ${bed.number}`,
+      },
+    );
   };
 
-  const totOcc = beds.filter(b => b.status === 'Occupied').length;
-  const totAvail = beds.filter(b => b.status === 'Available').length;
-  const totMaint = beds.filter(b => b.status === 'Maintenance').length;
+  const totOcc = beds.filter(b => b.status === 'OCCUPIED').length;
   const occRate = beds.length > 0 ? Math.round((totOcc / beds.length) * 100) : 0;
 
   return (
@@ -155,7 +166,7 @@ export default function Beds() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="search-box" style={{ maxWidth: 400 }}>
               <FiSearch className="search-icon" />
-              <input type="text" placeholder="Search by bed ID or patient name..." value={search} onChange={e => setSearch(e.target.value)} />
+              <input type="text" placeholder="Search by bed number or patient name..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
           </div>
         </div>
@@ -198,14 +209,14 @@ export default function Beds() {
                   {wardBeds.map(b => (
                     <div key={b.id}
                       onClick={() => {
-                        if (b.status === 'Available') setAdmittingBed(admittingBed?.id === b.id ? null : b);
-                        else if (b.status === 'Occupied' && confirm(`Discharge ${b.patientName} from ${b.id}?`)) { dischargePatient(b.id); notify.success(`${b.patientName} discharged from ${b.id}`); }
+                        if (b.status === 'AVAILABLE') setAdmittingBed(admittingBed?.id === b.id ? null : b);
+                        else if (b.status === 'OCCUPIED' && confirm(`Discharge ${b.patient?.name} from Bed ${b.number}?`)) handleDischarge(b);
                       }}
                       style={{
                         padding: '14px 10px', borderRadius: 'var(--radius-md)',
                         background: BED_STATUS_STYLES[b.status].bg,
                         borderLeft: `3px solid ${BED_STATUS_STYLES[b.status].border}`,
-                        cursor: b.status === 'Maintenance' ? 'default' : 'pointer',
+                        cursor: b.status === 'MAINTENANCE' ? 'default' : 'pointer',
                         textAlign: 'center', position: 'relative',
                         boxShadow: admittingBed?.id === b.id ? 'var(--shadow-md)' : 'var(--shadow-sm)',
                         transition: 'all var(--transition-fast)',
@@ -214,18 +225,18 @@ export default function Beds() {
                       onMouseLeave={e => { if (admittingBed?.id !== b.id) e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
                     >
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: BED_STATUS_STYLES[b.status].color, marginBottom: 6 }}>
-                        {b.id}
+                        Bed {b.number}
                       </div>
-                      <span className={`badge ${b.status === 'Available' ? 'badge-success' : b.status === 'Occupied' ? 'badge-info' : 'badge-warning'}`} style={{ fontSize: '0.68rem' }}>
+                      <span className={`badge ${b.status === 'AVAILABLE' ? 'badge-success' : b.status === 'OCCUPIED' ? 'badge-info' : 'badge-warning'}`} style={{ fontSize: '0.68rem' }}>
                         {b.status}
                       </span>
-                      {b.patientName && (
+                      {b.patient && (
                         <div style={{
                           fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-primary)',
                           marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
                           <FiUser style={{ fontSize: '0.7rem', marginRight: 4, verticalAlign: 'middle' }} />
-                          {b.patientName}
+                          {b.patient.name}
                         </div>
                       )}
                       {admittingBed?.id === b.id && (
@@ -284,7 +295,12 @@ export default function Beds() {
                           <button className="btn btn-ghost btn-sm" onClick={() => openEditWard(w)} title="Edit"><FiEdit2 /></button>
                           <button className="btn btn-ghost btn-sm text-danger" onClick={() => {
                             if (wt?.occupied > 0) { setManageError('Cannot delete ward with occupied beds'); return; }
-                            if (confirm(`Delete ${w.name} and all its beds?`)) handleDeleteWard(w.id);
+                            if (confirm(`Delete ${w.name} and all its beds?`)) {
+                              notify.promise(
+                                deleteWardMutation.mutateAsync(w.id).catch(err => { setManageError(errorMessage(err)); throw err; }),
+                                { loading: 'Deleting ward...', success: 'Ward deleted' },
+                              );
+                            }
                           }} title={wt?.occupied > 0 ? 'Ward has occupied beds' : 'Delete ward'}><FiTrash2 /></button>
                           <button className="btn btn-ghost btn-sm" onClick={() => handleAddBed(w.id)} title="Add bed"><FiPlus /></button>
                         </div>

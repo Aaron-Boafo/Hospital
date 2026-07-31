@@ -28,4 +28,13 @@ export const queryKeys = {
   activities: {
     all: ['activities'] as const,
   },
+  wards: {
+    all: ['wards'] as const,
+    detail: (id: string) => ['wards', id] as const,
+  },
+  beds: {
+    all: ['beds'] as const,
+    detail: (id: string) => ['beds', id] as const,
+    assignments: ['beds', 'assignments'] as const,
+  },
 }
