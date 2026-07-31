@@ -1,16 +1,25 @@
 import express, { type Express } from "express";
 import "dotenv/config";
-import { logger } from "./config/logger.config.js";
-import { pool } from "./database/db.js";
-import { gracefulShutdown } from "./utils/index.js";
+import { logger } from "@/shared/logger/index.js";
+import { pool } from "@/shared/database/db.js";
+import { gracefulShutdown } from "@/shared/utils/index.js";
 import {
   corsMiddleware,
   rateLimiter,
   requestId,
   requestLogger,
   securityHeaders,
-} from "./middleware/security.js";
-import { errorHandler, notFound } from "./middleware/helpers.js";
+} from "@/shared/middleware/security.js";
+import { errorHandler, notFound } from "@/shared/middleware/helpers.js";
+import { authenticate } from "@/shared/middleware/auth.js";
+import { userRouter } from "@/modules/user/index.js";
+import { activityRouter } from "@/modules/activity/index.js";
+import { patientRouter } from "@/modules/patient/index.js";
+import { doctorRouter } from "@/modules/doctor/index.js";
+import { appointmentRouter } from "@/modules/appointment/index.js";
+import { billingRouter } from "@/modules/billing/index.js";
+import { medicineRouter } from "@/modules/medicine/index.js";
+import { prescriptionRouter } from "@/modules/prescription/index.js";
 
 const parsedPort = Number(process.env.PORT);
 const PORT =
@@ -34,6 +43,20 @@ app.get("/health", (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use(userRouter);
+
+app.use(
+  "/api",
+  authenticate,
+  activityRouter,
+  patientRouter,
+  doctorRouter,
+  appointmentRouter,
+  billingRouter,
+  medicineRouter,
+  prescriptionRouter,
+);
 
 app.use(notFound);
 app.use(errorHandler);
