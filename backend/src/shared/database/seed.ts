@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import {
   activityLogs,
   appointments,
+  bedAssignments,
   beds,
   billItems,
   bills,
@@ -42,7 +43,12 @@ const ids = {
   wardGeneral: "c1000000-0000-4000-8000-000000000001",
   wardMaternity: "c2000000-0000-4000-8000-000000000002",
   wardEmergency: "c3000000-0000-4000-8000-000000000003",
+  assignmentActive: "e1000000-0000-4000-8000-000000000001",
+  assignmentDischarged: "e2000000-0000-4000-8000-000000000002",
 };
+
+const bedId = (wardIdx: number, n: number) =>
+  `d0000000-0000-4000-8000-${String(wardIdx).padStart(4, "0")}${String(n).padStart(8, "0")}`;
 
 async function wipe() {
   await db.delete(payments);
@@ -51,6 +57,7 @@ async function wipe() {
   await db.delete(prescriptionItems);
   await db.delete(prescriptions);
   await db.delete(appointments);
+  await db.delete(bedAssignments);
   await db.delete(beds);
   await db.delete(labResults);
   await db.delete(labTests);
@@ -324,14 +331,34 @@ async function seed() {
   ];
   await db.insert(wards).values(wardRows);
 
-  const bedRows = wardRows.flatMap((ward) =>
+  const bedRows = wardRows.flatMap((ward, wardIdx) =>
     Array.from({ length: ward.totalBeds }, (_, i) => ({
+      id: bedId(wardIdx, i + 1),
       wardId: ward.id,
       number: i + 1,
-      status: "AVAILABLE" as const,
+      status:
+        ward.id === ids.wardGeneral && i === 0 ? ("OCCUPIED" as const) : ("AVAILABLE" as const),
     })),
   );
   await db.insert(beds).values(bedRows);
+
+  await db.insert(bedAssignments).values([
+    {
+      id: ids.assignmentActive,
+      bedId: bedId(0, 1),
+      patientId: ids.patientJohn,
+      assignedBy: ids.admin,
+      admittedAt: new Date(Date.now() - 86400000 * 2),
+    },
+    {
+      id: ids.assignmentDischarged,
+      bedId: bedId(0, 2),
+      patientId: ids.patientMaria,
+      assignedBy: ids.admin,
+      admittedAt: new Date(Date.now() - 86400000 * 10),
+      dischargedAt: new Date(Date.now() - 86400000 * 3),
+    },
+  ]);
 }
 
 async function main() {
@@ -346,7 +373,7 @@ async function main() {
     await wipe();
   }
   await seed();
-  console.log("Seed complete: 4 users, 3 patients, 4 doctors, 3 appointments, 1 bill, 8 medicines, 3 wards, 43 beds, 3 activities.");
+  console.log("Seed complete: 4 users, 3 patients, 4 doctors, 3 appointments, 1 bill, 8 medicines, 3 wards, 43 beds, 2 bed assignments, 3 activities.");
 }
 
 main()

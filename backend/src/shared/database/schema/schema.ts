@@ -12,7 +12,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { defineRelations } from "drizzle-orm";
+import { defineRelations, sql } from "drizzle-orm";
 
 export const userRoleEnum = pgEnum("user_role", [
   "ADMIN",
@@ -107,6 +107,15 @@ export const bedStatusEnum = pgEnum("bed_status", [
   "AVAILABLE",
   "OCCUPIED",
   "MAINTENANCE",
+  "RESERVED",
+]);
+
+export const bedTypeEnum = pgEnum("bed_type", [
+  "STANDARD",
+  "PRIVATE",
+  "ICU",
+  "EMERGENCY",
+  "MATERNITY",
 ]);
 
 export const activityTypeEnum = pgEnum("activity_type", [
@@ -401,11 +410,8 @@ export const beds = pgTable(
       .notNull()
       .references(() => wards.id, { onDelete: "cascade" }),
     number: integer("number").notNull(),
+    bedType: bedTypeEnum("bed_type").notNull().default("STANDARD"),
     status: bedStatusEnum("status").notNull().default("AVAILABLE"),
-    patientId: uuid("patient_id").references(() => patients.id, {
-      onDelete: "set null",
-    }),
-    admittedDate: date("admitted_date"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -416,8 +422,45 @@ export const beds = pgTable(
   },
   (table) => [
     index("beds_ward_id_idx").on(table.wardId),
-    index("beds_patient_id_idx").on(table.patientId),
     uniqueIndex("beds_ward_id_number_idx").on(table.wardId, table.number),
+  ],
+);
+
+export const bedAssignments = pgTable(
+  "bed_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    bedId: uuid("bed_id")
+      .notNull()
+      .references(() => beds.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id, { onDelete: "cascade" }),
+    assignedBy: uuid("assigned_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    admittedAt: timestamp("admitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    dischargedAt: timestamp("discharged_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (table) => [
+    index("bed_assignments_bed_id_idx").on(table.bedId, table.dischargedAt),
+    index("bed_assignments_patient_id_idx").on(table.patientId),
+    index("bed_assignments_admitted_at_idx").on(table.admittedAt),
+    uniqueIndex("bed_assignments_active_bed_idx")
+      .on(table.bedId)
+      .where(sql`${table.dischargedAt} IS NULL`),
+    uniqueIndex("bed_assignments_active_patient_idx")
+      .on(table.patientId)
+      .where(sql`${table.dischargedAt} IS NULL`),
   ],
 );
 
@@ -489,19 +532,22 @@ const schema = {
   labResults,
   wards,
   beds,
+  bedAssignments,
   activityLogs,
   vitalSigns,
   visitRecords,
 };
 
 export const relations = defineRelations(schema, (r) => ({
-  users: {},
+  users: {
+    bedAssignments: r.many.bedAssignments(),
+  },
   patients: {
     appointments: r.many.appointments(),
     bills: r.many.bills(),
     labTests: r.many.labTests(),
     prescriptions: r.many.prescriptions(),
-    beds: r.many.beds(),
+    bedAssignments: r.many.bedAssignments(),
     vitalSigns: r.many.vitalSigns(),
     visitRecords: r.many.visitRecords(),
   },
@@ -582,9 +628,20 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.beds.wardId,
       to: r.wards.id,
     }),
+    assignments: r.many.bedAssignments(),
+  },
+  bedAssignments: {
+    bed: r.one.beds({
+      from: r.bedAssignments.bedId,
+      to: r.beds.id,
+    }),
     patient: r.one.patients({
-      from: r.beds.patientId,
+      from: r.bedAssignments.patientId,
       to: r.patients.id,
+    }),
+    assignedByUser: r.one.users({
+      from: r.bedAssignments.assignedBy,
+      to: r.users.id,
     }),
   },
   activityLogs: {},

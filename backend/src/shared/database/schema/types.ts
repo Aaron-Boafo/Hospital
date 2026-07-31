@@ -13,6 +13,7 @@ import {
   labResults,
   wards,
   beds,
+  bedAssignments,
   activityLogs,
   vitalSigns,
   visitRecords,
@@ -59,6 +60,9 @@ export type NewWard = typeof wards.$inferInsert;
 
 export type Bed = typeof beds.$inferSelect;
 export type NewBed = typeof beds.$inferInsert;
+
+export type BedAssignment = typeof bedAssignments.$inferSelect;
+export type NewBedAssignment = typeof bedAssignments.$inferInsert;
 
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type NewActivityLog = typeof activityLogs.$inferInsert;
