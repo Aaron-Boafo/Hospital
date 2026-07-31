@@ -8,3 +8,5 @@ export * from './prescriptions'
 export * from './activities'
 export * from './beds'
 export { queryKeys } from './queryKeys'
+export * from './ai-agent'
+

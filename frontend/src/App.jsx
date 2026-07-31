@@ -15,6 +15,7 @@ import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import DecisionSupport from './pages/DecisionSupport';
+import AiAgent from './pages/AiAgent';
 import Staff from './pages/Staff';
 import Reports from './pages/Reports';
 import Lab from './pages/Lab';
@@ -52,9 +53,11 @@ export default function App() {
               <Route path="decision-support" element={
                 <ProtectedRoute feature="clinical"><DecisionSupport /></ProtectedRoute>
               } />
+              <Route path="ai-agent" element={<AiAgent />} />
               <Route path="staff" element={
                 <ProtectedRoute feature="staff"><Staff /></ProtectedRoute>
               } />
+
               <Route path="reports" element={
                 <ProtectedRoute feature="reports"><Reports /></ProtectedRoute>
               } />

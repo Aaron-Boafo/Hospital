@@ -6,3 +6,5 @@ export * from './medicines'
 export * from './prescriptions'
 export * from './activities'
 export * from './beds'
+export * from './ai-agent'
+

@@ -1,14 +1,14 @@
 export interface Message {
-  role: "user" | "assistant";
-  content: string;
+  role: 'user' | 'assistant'
+  content: string
 }
 
 export interface AiAgentChatInput {
-  message: string;
-  history?: Message[];
+  message: string
+  history?: Message[]
 }
 
 export interface AiAgentChatResponse {
-  reply: string;
+  reply: string
 }
 

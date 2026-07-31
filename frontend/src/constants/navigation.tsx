@@ -2,6 +2,7 @@ import {
   FiGrid, FiUsers, FiCalendar, FiUserPlus,
   FiDollarSign, FiZap, FiSettings, FiUser, FiActivity,
   FiShield, FiBarChart2, FiClipboard, FiFileText, FiPackage,
+  FiCpu,
 } from 'react-icons/fi'
 
 export const NAV_ITEMS = [
@@ -11,6 +12,7 @@ export const NAV_ITEMS = [
   { to: '/doctors', icon: <FiShield />, label: 'Doctors', feature: 'doctors' },
   { to: '/billing', icon: <FiDollarSign />, label: 'Billing', feature: 'billing' },
   { to: '/decision-support', icon: <FiActivity />, label: 'AI Diagnosis', feature: 'clinical' },
+  { to: '/ai-agent', icon: <FiCpu />, label: 'AI Copilot', feature: null },
   { to: '/staff', icon: <FiUserPlus />, label: 'Staff', feature: 'staff' },
   { to: '/reports', icon: <FiBarChart2 />, label: 'Reports', feature: 'reports' },
   { to: '/laboratory', icon: <FiFileText />, label: 'Laboratory', feature: 'laboratory' },
@@ -20,3 +22,4 @@ export const NAV_ITEMS = [
   { to: '/profile', icon: <FiUser />, label: 'Profile', feature: null },
   { to: '/settings', icon: <FiSettings />, label: 'Settings', feature: null },
 ]
+
