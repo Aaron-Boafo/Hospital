@@ -2,6 +2,8 @@ import "dotenv/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { relations } from "./schema/schema.js";
+import { DataSource } from "typeorm";
+import { SqlDatabase } from "@langchain/classic/sql_db";
 
 const DB_STRING =
   process.env.NODE_ENV === "test"
@@ -19,4 +21,17 @@ const db = drizzle({
   relations,
 });
 
-export { pool, db };
+const datasource = new DataSource({
+  type: "postgres",
+  url: DB_STRING,
+  entities: ["./src/modules/**/*.entity.ts"],
+  synchronize: true,
+});
+
+await datasource.initialize();
+
+const agent_db = await SqlDatabase.fromDataSourceParams({
+  appDataSource: datasource,
+});
+
+export { pool, db, agent_db };
