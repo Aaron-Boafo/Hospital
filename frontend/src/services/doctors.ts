@@ -1,41 +1,5 @@
 import { request } from '../api'
-
-export const DEPARTMENTS = [
-  'GENERAL MEDICINE',
-  'PEDIATRICS',
-  'CARDIOLOGY',
-  'ORTHOPEDICS',
-  'NEUROLOGY',
-  'DERMATOLOGY',
-  'ENT',
-  'GYNECOLOGY',
-  'OPHTHALMOLOGY',
-] as const
-export type Department = (typeof DEPARTMENTS)[number]
-
-export interface DoctorDto {
-  id: string
-  name: string
-  department: Department
-  phone: string | null
-  email: string | null
-  active: boolean
-  createdAt: string
-}
-
-export interface CreateDoctorInput {
-  name: string
-  department: Department
-  phone?: string | undefined
-  email?: string | undefined
-}
-
-export type UpdateDoctorInput = {
-  name?: string | undefined
-  department?: Department | undefined
-  phone?: string | undefined
-  email?: string | undefined
-}
+import type { CreateDoctorInput, DoctorDto, UpdateDoctorInput } from '../types'
 
 export async function fetchDoctors(activeOnly?: boolean): Promise<DoctorDto[]> {
   const { doctors } = await request.get<{ doctors: DoctorDto[] }>('/doctors', {

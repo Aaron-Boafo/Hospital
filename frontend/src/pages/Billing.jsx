@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useBills, usePatients, useCreateBill, useRecordPayment } from '../hooks';
-import { PAYMENT_METHODS } from '../services/billing';
+import { PAYMENT_METHODS } from '../constants';
 import { FiSearch, FiPlus, FiX, FiDollarSign, FiPrinter, FiTrash2, FiCreditCard } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 

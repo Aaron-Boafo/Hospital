@@ -7,7 +7,7 @@ import {
   fetchMedicines,
   updateMedicine,
 } from '../services/medicines'
-import type { CreateMedicineInput, UpdateMedicineInput } from '../services/medicines'
+import type { CreateMedicineInput, UpdateMedicineInput } from '../types'
 
 export function useMedicines() {
   return useQuery({

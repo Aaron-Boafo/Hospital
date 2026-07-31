@@ -7,7 +7,7 @@ import {
   toggleDoctorActive,
   updateDoctor,
 } from '../services/doctors'
-import type { CreateDoctorInput, UpdateDoctorInput } from '../services/doctors'
+import type { CreateDoctorInput, UpdateDoctorInput } from '../types'
 
 export function useDoctors(activeOnly?: boolean) {
   return useQuery({

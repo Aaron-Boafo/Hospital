@@ -5,13 +5,7 @@ import {
   FiDownload, FiFilter, FiBarChart2
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
-
-const PERIODS = [
-  { value: 'today', label: 'Today' },
-  { value: 'week', label: 'This Week' },
-  { value: 'month', label: 'This Month' },
-  { value: 'all', label: 'All Time' },
-];
+import { PERIODS } from '../constants';
 
 function getRange(period) {
   const now = new Date();

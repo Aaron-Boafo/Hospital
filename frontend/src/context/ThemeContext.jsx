@@ -1,8 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { THEME_KEY } from '../constants';
 
 const ThemeContext = createContext(null);
-
-const LS_KEY = 'hms_theme';
 
 function getSystemTheme() {
   if (typeof window === 'undefined') return 'light';
@@ -15,7 +14,7 @@ function applyTheme(resolved) {
 
 function readStoredTheme() {
   try {
-    const saved = localStorage.getItem(LS_KEY);
+    const saved = localStorage.getItem(THEME_KEY);
     if (saved === 'dark' || saved === 'light' || saved === 'system') return saved;
   } catch {
     // localStorage unavailable (private mode)
@@ -28,7 +27,7 @@ export function ThemeProvider({ children }) {
 
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
-    try { localStorage.setItem(LS_KEY, newTheme); } catch {
+    try { localStorage.setItem(THEME_KEY, newTheme); } catch {
       // localStorage unavailable (private mode)
     }
   }, []);

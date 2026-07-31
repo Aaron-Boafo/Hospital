@@ -13,7 +13,7 @@ import type {
   AppointmentStatus,
   CreateAppointmentInput,
   UpdateAppointmentInput,
-} from '../services/appointments'
+} from '../types'
 
 export function useAppointments(filters?: AppointmentFilters) {
   return useQuery({

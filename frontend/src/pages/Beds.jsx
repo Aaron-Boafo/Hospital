@@ -1,19 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
+import { usePatients } from '../hooks';
 import {
   FiGrid, FiUser, FiX, FiCheck, FiAlertCircle, FiHome,
   FiPlus, FiSearch, FiSettings, FiTrash2, FiEdit2, FiSave
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
-
-const STATUS_STYLES = {
-  Available: { bg: 'var(--color-success-bg)', color: 'var(--color-success)', border: 'var(--color-success)' },
-  Occupied: { bg: 'var(--color-info-bg)', color: 'var(--color-info)', border: 'var(--color-info)' },
-  Maintenance: { bg: 'var(--color-warning-bg)', color: 'var(--color-warning)', border: 'var(--color-warning)' },
-};
+import { BED_STATUS_STYLES } from '../constants';
 
 export default function Beds() {
-  const { wards, beds, patients, admitPatient, dischargePatient, addWard, removeWard, updateWard, addBed, removeBed } = useData();
+  const { wards, beds, admitPatient, dischargePatient, addWard, removeWard, updateWard, addBed, removeBed } = useData();
+  const { data: patients = [], isLoading: patientsLoading } = usePatients();
   const [search, setSearch] = useState('');
   const [wardFilter, setWardFilter] = useState('All');
 
@@ -200,8 +197,8 @@ export default function Beds() {
                       }}
                       style={{
                         padding: '14px 10px', borderRadius: 'var(--radius-md)',
-                        background: STATUS_STYLES[b.status].bg,
-                        borderLeft: `3px solid ${STATUS_STYLES[b.status].border}`,
+                        background: BED_STATUS_STYLES[b.status].bg,
+                        borderLeft: `3px solid ${BED_STATUS_STYLES[b.status].border}`,
                         cursor: b.status === 'Maintenance' ? 'default' : 'pointer',
                         textAlign: 'center', position: 'relative',
                         boxShadow: admittingBed?.id === b.id ? 'var(--shadow-md)' : 'var(--shadow-sm)',
@@ -210,7 +207,7 @@ export default function Beds() {
                       onMouseEnter={e => { if (admittingBed?.id !== b.id) e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
                       onMouseLeave={e => { if (admittingBed?.id !== b.id) e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
                     >
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: STATUS_STYLES[b.status].color, marginBottom: 6 }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: BED_STATUS_STYLES[b.status].color, marginBottom: 6 }}>
                         {b.id}
                       </div>
                       <span className={`badge ${b.status === 'Available' ? 'badge-success' : b.status === 'Occupied' ? 'badge-info' : 'badge-warning'}`} style={{ fontSize: '0.68rem' }}>
@@ -229,6 +226,7 @@ export default function Beds() {
                         <form onSubmit={handleAdmit} onClick={e => e.stopPropagation()} style={{ marginTop: 10, borderTop: '1px solid var(--color-border)', paddingTop: 10 }}>
                           <select className="form-control" style={{ fontSize: '0.75rem', padding: '4px 6px', marginBottom: 6 }} value={selectedPatient} onChange={e => setSelectedPatient(e.target.value)} required>
                             <option value="">Select patient</option>
+                            {patientsLoading && <option value="">Loading patients…</option>}
                             {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </select>
                           <div style={{ display: 'flex', gap: 4 }}>

@@ -1,44 +1,11 @@
 import { request } from '../api'
-
-export const APPOINTMENT_STATUSES = ['SCHEDULED', 'COMPLETED', 'CANCELLED'] as const
-export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
-
-export interface AppointmentRef {
-  id: string
-  name: string
-}
-
-export interface AppointmentDto {
-  id: string
-  patient: AppointmentRef
-  doctor: AppointmentRef
-  date: string
-  time: string
-  status: AppointmentStatus
-  notes: string | null
-  createdAt: string
-}
-
-export interface CreateAppointmentInput {
-  patientId: string
-  doctorId: string
-  date: string
-  time: string
-  notes?: string | undefined
-}
-
-export type UpdateAppointmentInput = {
-  patientId?: string | undefined
-  doctorId?: string | undefined
-  date?: string | undefined
-  time?: string | undefined
-  notes?: string | undefined
-}
-
-export interface AppointmentFilters {
-  date?: string | undefined
-  status?: AppointmentStatus | undefined
-}
+import type {
+  AppointmentDto,
+  AppointmentFilters,
+  AppointmentStatus,
+  CreateAppointmentInput,
+  UpdateAppointmentInput,
+} from '../types'
 
 export async function fetchAppointments(filters?: AppointmentFilters): Promise<AppointmentDto[]> {
   const { appointments } = await request.get<{ appointments: AppointmentDto[] }>('/appointments', {

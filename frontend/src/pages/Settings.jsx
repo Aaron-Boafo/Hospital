@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  FiCheck, FiSliders, FiBell, FiDatabase,
-  FiSun, FiMoon, FiMonitor, FiTrash2,
+  FiCheck,
+  FiTrash2,
   FiDownload, FiAlertTriangle, FiHardDrive,
   FiRefreshCw, FiClock, FiUser, FiFileText,
   FiInfo, FiAlertCircle, FiCheckCircle
@@ -11,31 +11,7 @@ import { useActivities, usePatients, useDoctors, useAppointments, useBills } fro
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import PageHeader from '../components/PageHeader';
-
-const TABS = [
-  { id: 'general', label: 'General', icon: FiSliders },
-  { id: 'notifications', label: 'Notifications', icon: FiBell },
-  { id: 'data', label: 'Data Management', icon: FiDatabase },
-];
-
-const THEME_OPTIONS = [
-  { value: 'light', label: 'Light Mode', icon: FiSun },
-  { value: 'dark', label: 'Dark Mode', icon: FiMoon },
-  { value: 'system', label: 'System Default', icon: FiMonitor },
-];
-
-const LANGUAGE_OPTIONS = [
-  { value: 'en', label: 'English' },
-  { value: 'fr', label: 'French' },
-  { value: 'es', label: 'Spanish' },
-];
-
-
-const DATE_FORMAT_OPTIONS = [
-  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
-  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
-  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO)' },
-];
+import { TABS, THEME_OPTIONS, LANGUAGE_OPTIONS, DATE_FORMAT_OPTIONS } from '../constants';
 
 export default function Settings() {
   const { data: activities = [], isLoading: activitiesLoading } = useActivities();
@@ -104,6 +80,7 @@ export default function Settings() {
     queryClient.clear();
     localStorage.removeItem('hms_user');
     localStorage.removeItem('hms_data');
+    localStorage.removeItem('hms_data_v2');
     localStorage.removeItem('hms_settings');
     localStorage.removeItem('hms_backup');
     setCacheMsg('Cache cleared! Reloading...');

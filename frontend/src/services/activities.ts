@@ -1,19 +1,5 @@
 import { request } from '../api'
-
-export const ACTIVITY_TYPES = ['ACCENT', 'INFO', 'SUCCESS', 'WARNING', 'DANGER'] as const
-export type ActivityType = (typeof ACTIVITY_TYPES)[number]
-
-export interface ActivityDto {
-  id: string
-  text: string
-  type: ActivityType
-  time: string
-}
-
-export interface CreateActivityInput {
-  text: string
-  type: ActivityType
-}
+import type { ActivityDto, CreateActivityInput } from '../types'
 
 export async function fetchActivities(): Promise<ActivityDto[]> {
   const { activities } = await request.get<{ activities: ActivityDto[] }>('/activities')

@@ -5,12 +5,7 @@ import {
   FiUser, FiThermometer, FiFileText, FiZap
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
-
-const URGENCY_STYLES = {
-  Critical: { bg: 'var(--color-danger-bg)', color: 'var(--color-danger)' },
-  Urgent: { bg: 'var(--color-warning-bg)', color: 'var(--color-warning)' },
-  Routine: { bg: 'var(--color-success-bg)', color: 'var(--color-success)' },
-};
+import { URGENCY_STYLES } from '../constants';
 
 function parseAIResponse(text) {
   const sections = { diagnoses: [], tests: [], treatments: [], urgency: 'Routine', raw: text };

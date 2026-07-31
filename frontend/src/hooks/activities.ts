@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../services/queryKeys'
 import { createActivity, fetchActivities } from '../services/activities'
-import type { CreateActivityInput } from '../services/activities'
+import type { CreateActivityInput } from '../types'
 
 export function useActivities() {
   return useQuery({

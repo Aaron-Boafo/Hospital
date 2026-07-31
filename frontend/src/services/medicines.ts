@@ -1,53 +1,5 @@
 import { request } from '../api'
-
-export const MEDICINE_CATEGORIES = [
-  'ANTIBIOTICS',
-  'ANALGESICS',
-  'ANTIHYPERTENSIVES',
-  'ANTIDIABETICS',
-  'ANTACIDS',
-  'VITAMINS',
-  'DERMATOLOGICAL',
-  'RESPIRATORY',
-  'CARDIOVASCULAR',
-  'OTHER',
-] as const
-export type MedicineCategory = (typeof MEDICINE_CATEGORIES)[number]
-
-export interface MedicineDto {
-  id: string
-  name: string
-  category: MedicineCategory
-  unitPrice: number
-  quantity: number
-  reorderLevel: number
-  expiryDate: string | null
-  supplier: string | null
-  createdAt: string
-  isLowStock: boolean
-  isExpired: boolean
-  isExpiringSoon: boolean
-}
-
-export interface CreateMedicineInput {
-  name: string
-  category: MedicineCategory
-  unitPrice: number
-  quantity: number
-  reorderLevel?: number | undefined
-  expiryDate?: string | undefined
-  supplier?: string | undefined
-}
-
-export type UpdateMedicineInput = {
-  name?: string | undefined
-  category?: MedicineCategory | undefined
-  unitPrice?: number | undefined
-  quantity?: number | undefined
-  reorderLevel?: number | undefined
-  expiryDate?: string | undefined
-  supplier?: string | undefined
-}
+import type { CreateMedicineInput, MedicineDto, UpdateMedicineInput } from '../types'
 
 export async function fetchMedicines(): Promise<MedicineDto[]> {
   const { medicines } = await request.get<{ medicines: MedicineDto[] }>('/medicines')

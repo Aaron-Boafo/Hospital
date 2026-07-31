@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDoctors, useCreateDoctor, useUpdateDoctor, useToggleDoctorActive } from '../hooks';
-import { DEPARTMENTS } from '../services/doctors';
+import { DEPARTMENTS } from '../constants';
 import { FiSearch, FiPlus, FiEdit2, FiX, FiUserPlus, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 

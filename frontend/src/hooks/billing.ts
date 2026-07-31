@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../services/queryKeys'
 import { createBill, fetchBill, fetchBills, recordPayment } from '../services/billing'
-import type { BillFilters, CreateBillInput, RecordPaymentInput } from '../services/billing'
+import type { BillFilters, CreateBillInput, RecordPaymentInput } from '../types'
 
 export function useBills(filters?: BillFilters) {
   return useQuery({

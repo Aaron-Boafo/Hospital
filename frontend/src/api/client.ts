@@ -1,18 +1,7 @@
 import axios from 'axios'
 import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
-
-declare module 'axios' {
-  export interface InternalAxiosRequestConfig {
-    _retry?: boolean
-  }
-}
-
-export const SESSION_KEY = 'hms_user'
-
-export interface ApiIssue {
-  path: string
-  message: string
-}
+import { SESSION_KEY } from '../constants/storage'
+import type { ApiIssue } from '../types/api'
 
 export class ApiError extends Error {
   status?: number

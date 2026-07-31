@@ -1,15 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  FiUser, FiMail, FiPhone, FiShield, FiCalendar, FiCheck,
-  FiEdit2, FiX, FiCamera, FiKey, FiLock, FiAlertTriangle
+  FiMail, FiPhone, FiShield, FiCalendar, FiCheck,
+  FiEdit2, FiX, FiCamera, FiKey, FiAlertTriangle
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
-
-const TABS = [
-  { id: 'personal', label: 'Personal Info', icon: FiUser },
-  { id: 'security', label: 'Security', icon: FiLock },
-];
+import { PROFILE_TABS } from '../constants';
 
 export default function Profile() {
   const { user, changePassword } = useAuth();
@@ -173,7 +169,7 @@ export default function Profile() {
           {/* Right: Tabbed Form Card */}
           <div className="card">
             <div className="tabs" style={{ marginBottom: 0 }}>
-              {TABS.map(tab => (
+              {PROFILE_TABS.map(tab => (
                 <button
                   key={tab.id}
                   type="button"

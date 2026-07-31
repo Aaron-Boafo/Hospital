@@ -16,7 +16,7 @@ import type {
   CreateVitalSignInput,
   CreateVisitRecordInput,
   UpdatePatientInput,
-} from '../services/patients'
+} from '../types'
 
 export function usePatients(search?: string) {
   return useQuery({

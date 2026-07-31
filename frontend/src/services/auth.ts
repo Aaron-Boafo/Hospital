@@ -1,13 +1,5 @@
 import { request } from '../api'
-
-export interface User {
-  id: string
-  name: string
-  email: string | null
-  role: string
-  active: boolean
-  createdAt: string
-}
+import type { User } from '../types'
 
 export async function login(idToken: string): Promise<User> {
   const { user } = await request.post<{ user: User }>('/auth/login', { idToken })

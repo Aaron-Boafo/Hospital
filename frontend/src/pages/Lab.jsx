@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useData, LAB_TESTS } from '../context/DataContext';
+import { useData } from '../context/DataContext';
+import { LAB_TESTS } from '../constants';
+import { usePatients } from '../hooks';
 import {
   FiSearch, FiPlus, FiX, FiCheckCircle, FiClock, FiUser,
   FiAlertCircle, FiActivity, FiFileText
@@ -7,7 +9,8 @@ import {
 import PageHeader from '../components/PageHeader';
 
 export default function Lab() {
-  const { patients, labTests, labResults, orderLabTest, submitLabResult } = useData();
+  const { labTests, labResults, orderLabTest, submitLabResult } = useData();
+  const { data: patients = [], isLoading: patientsLoading } = usePatients();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -146,6 +149,7 @@ export default function Lab() {
                   <label>Patient *</label>
                   <select className="form-control" value={orderForm.patientId} onChange={handlePatientChange} required>
                     <option value="">Select a patient</option>
+                    {patientsLoading && <option value="">Loading patients…</option>}
                     {patients.map(p => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}
                   </select>
                 </div>

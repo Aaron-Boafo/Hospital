@@ -6,7 +6,7 @@ import {
   fetchPrescription,
   fetchPrescriptions,
 } from '../services/prescriptions'
-import type { CreatePrescriptionInput } from '../services/prescriptions'
+import type { CreatePrescriptionInput } from '../types'
 
 export function usePrescriptions(patientId?: string) {
   return useQuery({

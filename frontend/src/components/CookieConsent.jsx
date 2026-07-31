@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { FiShield } from 'react-icons/fi';
-
-const CONSENT_KEY = 'cookie_consent';
+import { CONSENT_KEY } from '../constants';
 
 function getStoredConsent() {
   try {

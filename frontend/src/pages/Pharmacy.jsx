@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMedicines, useCreateMedicine, useUpdateMedicine, useDeleteMedicine } from '../hooks';
-import { MEDICINE_CATEGORIES } from '../services/medicines';
+import { MEDICINE_CATEGORIES } from '../constants';
 import {
   FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiPackage,
   FiAlertTriangle, FiClock, FiDollarSign

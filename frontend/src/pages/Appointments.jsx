@@ -5,10 +5,9 @@ import {
   FiList, FiChevronLeft, FiChevronRight, FiClock, FiUser
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
+import { DAYS, MONTHS } from '../constants';
 
 const INITIAL_FORM = { patientId: '', doctorId: '', date: '', time: '', notes: '' };
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
 
