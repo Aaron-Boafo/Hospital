@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { FiSearch, FiPlus, FiEdit2, FiX, FiUserPlus, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
+import PageHeader from '../components/PageHeader';
 
 const DEPARTMENTS = ['General Medicine', 'Pediatrics', 'Cardiology', 'Orthopedics', 'Neurology', 'Dermatology', 'ENT', 'Gynecology', 'Ophthalmology'];
 const INITIAL_FORM = { name: '', department: DEPARTMENTS[0], phone: '', email: '' };
@@ -48,22 +49,26 @@ export default function Doctors() {
 
   return (
     <>
-      <div className="page-header">
-        <h1>Doctors</h1>
-        <button className="btn btn-primary" onClick={openAdd}><FiPlus /> Add Doctor</button>
-      </div>
+      <PageHeader title="Doctors" />
 
       <div className="page-body fade-in">
-        <div className="toolbar">
-          <div className="search-box">
-            <FiSearch className="search-icon" />
-            <input type="text" placeholder="Search doctors..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <select className="form-control" style={{ width: 180 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
+              <option>All</option>
+              {allDepartments.map(d => <option key={d}>{d}</option>)}
+            </select>
+            <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{filtered.length} doctors</span>
           </div>
-          <select className="form-control" style={{ width: 180 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-            <option>All</option>
-            {allDepartments.map(d => <option key={d}>{d}</option>)}
-          </select>
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>{filtered.length} doctors</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="search-box" style={{ maxWidth: 400 }}>
+              <FiSearch className="search-icon" />
+              <input type="text" placeholder="Search doctors..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <button className="btn btn-primary" onClick={openAdd}><FiPlus /> Add Doctor</button>
+            </div>
+          </div>
         </div>
 
         {filtered.length === 0 ? (

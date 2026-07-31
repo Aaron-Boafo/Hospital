@@ -1,8 +1,160 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
-import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiCalendar, FiCheck, FiXCircle } from 'react-icons/fi';
+import {
+  FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiCalendar, FiCheck, FiXCircle,
+  FiList, FiChevronLeft, FiChevronRight, FiClock, FiUser
+} from 'react-icons/fi';
+import PageHeader from '../components/PageHeader';
 
 const INITIAL_FORM = { patientId: '', patientName: '', doctorId: '', doctorName: '', date: '', time: '', notes: '' };
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function CalendarView({ appointments, onDayClick, selectedDate }) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const aptMap = useMemo(() => {
+    const map = {};
+    appointments.forEach(a => {
+      if (!map[a.date]) map[a.date] = [];
+      map[a.date].push(a);
+    });
+    return map;
+  }, [appointments]);
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
+        <button className="btn btn-ghost btn-sm" onClick={prevMonth}><FiChevronLeft /></button>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>{MONTHS[month]} {year}</h3>
+        <button className="btn btn-ghost btn-sm" onClick={nextMonth}><FiChevronRight /></button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0 }}>
+        {DAYS.map(d => (
+          <div key={d} style={{ padding: '10px 4px', textAlign: 'center', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--color-border)' }}>
+            {d}
+          </div>
+        ))}
+        {cells.map((day, i) => {
+          if (day === null) return <div key={`empty-${i}`} style={{ minHeight: 90, borderRight: (i % 7) < 6 ? '1px solid var(--color-border)' : 'none', borderBottom: '1px solid var(--color-border)' }} />;
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const apts = aptMap[dateStr] || [];
+          const isToday = dateStr === today;
+          const isSelected = dateStr === selectedDate;
+          return (
+            <div
+              key={dateStr}
+              onClick={() => onDayClick(dateStr)}
+              style={{
+                minHeight: 90, padding: 6, cursor: 'pointer',
+                borderRight: (i % 7) < 6 ? '1px solid var(--color-border)' : 'none',
+                borderBottom: i < cells.length - 1 ? '1px solid var(--color-border)' : 'none',
+                background: isSelected ? 'var(--color-accent-light)' : isToday ? 'var(--color-bg-tertiary)' : 'transparent',
+                transition: 'background var(--transition-fast)',
+              }}
+              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--color-bg-tertiary)'; }}
+              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = isToday ? 'var(--color-bg-tertiary)' : 'transparent'; }}
+            >
+              <div style={{
+                fontSize: '0.78rem', fontWeight: isToday ? 700 : 400,
+                color: isToday ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                marginBottom: 4, textAlign: 'right',
+              }}>
+                {day}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {apts.slice(0, 3).map(a => (
+                  <div key={a.id} style={{
+                    fontSize: '0.62rem', padding: '2px 4px', borderRadius: 'var(--radius-sm)',
+                    background: a.status === 'Completed' ? 'var(--color-success-bg)' :
+                      a.status === 'Cancelled' ? 'var(--color-danger-bg)' : 'var(--color-info-bg)',
+                    color: a.status === 'Completed' ? 'var(--color-success)' :
+                      a.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-info)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.4,
+                  }}>
+                    {a.time} {a.patientName.split(' ')[0]}
+                  </div>
+                ))}
+                {apts.length > 3 && (
+                  <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', paddingLeft: 4 }}>+{apts.length - 3} more</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DayDetail({ date, appointments, onClose, onEdit, onDelete, onStatusChange }) {
+  const apts = appointments.filter(a => a.date === date);
+  const dateObj = new Date(date + 'T00:00:00');
+  const label = `${DAYS[dateObj.getDay()]}, ${MONTHS[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-header">
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FiCalendar style={{ color: 'var(--color-accent)' }} /> {label}
+        </h3>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}><FiX /></button>
+      </div>
+      {apts.length === 0 ? (
+        <div className="empty-state" style={{ padding: 30 }}>
+          <p className="text-muted">No appointments on this day</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '4px 0' }}>
+          {apts.sort((a, b) => a.time.localeCompare(b.time)).map(a => (
+            <div key={a.id} style={{
+              display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px',
+              borderLeft: `3px solid ${a.status === 'Completed' ? 'var(--color-success)' : a.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-info)'}`,
+              background: 'var(--color-bg-tertiary)', borderRadius: '0 var(--radius-md) var(--radius-md) 0',
+            }}>
+              <div style={{ textAlign: 'center', minWidth: 50 }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{a.time}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{a.patientName}</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <FiUser style={{ fontSize: '0.7rem' }} /> {a.doctorName}
+                </div>
+                {a.notes && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>{a.notes}</div>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className={`badge ${a.status === 'Completed' ? 'badge-success' : a.status === 'Cancelled' ? 'badge-danger' : 'badge-info'}`}>
+                  {a.status}
+                </span>
+                {a.status === 'Scheduled' && (
+                  <>
+                    <button className="btn btn-success btn-sm" onClick={() => onStatusChange(a.id, 'Completed')} title="Complete"><FiCheck /></button>
+                    <button className="btn btn-danger btn-sm" onClick={() => onStatusChange(a.id, 'Cancelled')} title="Cancel"><FiXCircle /></button>
+                  </>
+                )}
+                <button className="btn btn-ghost btn-sm" onClick={() => onEdit(a)} title="Edit"><FiEdit2 /></button>
+                <button className="btn btn-ghost btn-sm text-danger" onClick={() => onDelete(a.id)} title="Delete"><FiTrash2 /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Appointments() {
   const { appointments, patients, doctors, addAppointment, updateAppointment, deleteAppointment } = useData();
@@ -12,6 +164,8 @@ export default function Appointments() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [view, setView] = useState('table');
+  const [calSelectedDate, setCalSelectedDate] = useState(null);
 
   const activeDoctors = doctors.filter(d => d.active);
 
@@ -24,9 +178,9 @@ export default function Appointments() {
     return matchSearch && matchDate && matchStatus;
   });
 
-  const openAdd = () => {
+  const openAdd = (date) => {
     setEditing(null);
-    setForm({ ...INITIAL_FORM, date: dateFilter || new Date().toISOString().slice(0, 10) });
+    setForm({ ...INITIAL_FORM, date: date || dateFilter || new Date().toISOString().slice(0, 10) });
     setShowModal(true);
   };
 
@@ -73,90 +227,120 @@ export default function Appointments() {
 
   return (
     <>
-      <div className="page-header">
-        <h1>Appointments</h1>
-        <button className="btn btn-primary" onClick={openAdd}><FiPlus /> New Appointment</button>
-      </div>
+      <PageHeader title="Appointments" />
 
       <div className="page-body fade-in">
-        <div className="toolbar">
-          <div className="search-box">
-            <FiSearch className="search-icon" />
-            <input type="text" placeholder="Search patient or doctor..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <input
+              type="date"
+              className="form-control"
+              style={{ width: 180 }}
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value)}
+            />
+            <select className="form-control" style={{ width: 150 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option>All</option>
+              <option>Scheduled</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+            </select>
+            <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+              {view === 'table' ? `${filtered.length} results` : `${appointments.length} total`}
+            </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button className={`btn btn-sm ${view === 'table' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('table')}><FiList /> List</button>
+              <button className={`btn btn-sm ${view === 'calendar' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('calendar')}><FiCalendar /> Calendar</button>
+            </div>
           </div>
-          <input
-            type="date"
-            className="form-control"
-            style={{ width: 180 }}
-            value={dateFilter}
-            onChange={e => setDateFilter(e.target.value)}
-          />
-          <select className="form-control" style={{ width: 150 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option>All</option>
-            <option>Scheduled</option>
-            <option>Completed</option>
-            <option>Cancelled</option>
-          </select>
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>{filtered.length} results</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="search-box" style={{ maxWidth: 400 }}>
+              <FiSearch className="search-icon" />
+              <input type="text" placeholder="Search patient or doctor..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <button className="btn btn-primary" onClick={() => openAdd()}><FiPlus /> New Appointment</button>
+            </div>
+          </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon"><FiCalendar /></div>
-            <h3>No appointments found</h3>
-            <p>Try adjusting the date or filters</p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Patient</th>
-                  <th>Doctor</th>
-                  <th>Status</th>
-                  <th>Notes</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(a => (
-                  <tr key={a.id}>
-                    <td><span className="badge badge-accent">{a.id}</span></td>
-                    <td>{a.date}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{a.time}</td>
-                    <td>{a.patientName}</td>
-                    <td>{a.doctorName}</td>
-                    <td>
-                      <span className={`badge ${
-                        a.status === 'Completed' ? 'badge-success' :
-                        a.status === 'Cancelled' ? 'badge-danger' : 'badge-info'
-                      }`}>{a.status}</span>
-                    </td>
-                    <td style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes || '—'}</td>
-                    <td>
-                      <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
-                        {a.status === 'Scheduled' && (
-                          <>
-                            <button className="btn btn-success btn-sm" onClick={() => handleStatusChange(a.id, 'Completed')} title="Complete">
-                              <FiCheck />
-                            </button>
-                            <button className="btn btn-danger btn-sm" onClick={() => handleStatusChange(a.id, 'Cancelled')} title="Cancel">
-                              <FiXCircle />
-                            </button>
-                          </>
-                        )}
-                        <button className="btn btn-ghost btn-sm" onClick={() => openEdit(a)} title="Edit"><FiEdit2 /></button>
-                        <button className="btn btn-ghost btn-sm text-danger" onClick={() => handleDeleteApt(a.id)} title="Delete"><FiTrash2 /></button>
-                      </div>
-                    </td>
+        {view === 'table' ? (
+          filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon"><FiCalendar /></div>
+              <h3>No appointments found</h3>
+              <p>Try adjusting the date or filters</p>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Patient</th>
+                    <th>Doctor</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map(a => (
+                    <tr key={a.id}>
+                      <td><span className="badge badge-accent">{a.id}</span></td>
+                      <td>{a.date}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{a.time}</td>
+                      <td>{a.patientName}</td>
+                      <td>{a.doctorName}</td>
+                      <td>
+                        <span className={`badge ${
+                          a.status === 'Completed' ? 'badge-success' :
+                          a.status === 'Cancelled' ? 'badge-danger' : 'badge-info'
+                        }`}>{a.status}</span>
+                      </td>
+                      <td style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes || '—'}</td>
+                      <td>
+                        <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
+                          {a.status === 'Scheduled' && (
+                            <>
+                              <button className="btn btn-success btn-sm" onClick={() => handleStatusChange(a.id, 'Completed')} title="Complete">
+                                <FiCheck />
+                              </button>
+                              <button className="btn btn-danger btn-sm" onClick={() => handleStatusChange(a.id, 'Cancelled')} title="Cancel">
+                                <FiXCircle />
+                              </button>
+                            </>
+                          )}
+                          <button className="btn btn-ghost btn-sm" onClick={() => openEdit(a)} title="Edit"><FiEdit2 /></button>
+                          <button className="btn btn-ghost btn-sm text-danger" onClick={() => handleDeleteApt(a.id)} title="Delete"><FiTrash2 /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <>
+            <CalendarView
+              appointments={appointments}
+              onDayClick={(date) => { setCalSelectedDate(date); setDateFilter(date); }}
+              selectedDate={calSelectedDate}
+            />
+            {calSelectedDate && (
+              <DayDetail
+                date={calSelectedDate}
+                appointments={appointments}
+                onClose={() => setCalSelectedDate(null)}
+                onEdit={openEdit}
+                onDelete={handleDeleteApt}
+                onStatusChange={handleStatusChange}
+              />
+            )}
+          </>
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiEye, FiX, FiUser } from 'react-icons/fi';
+import PageHeader from '../components/PageHeader';
 
 const INITIAL_FORM = { name: '', dob: '', gender: 'Male', phone: '', address: '', emergencyContact: '' };
 
@@ -66,31 +67,31 @@ export default function Patients() {
       <>
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="btn btn-ghost" onClick={() => setViewing(null)}>← Back</button>
+            <button className="btn btn-primary btn-sm" onClick={() => setViewing(null)}>← Back</button>
             <h1>Patient Details</h1>
-          </div>
-          <div className="btn-group">
-            <button className="btn btn-secondary btn-sm" onClick={() => { openEdit(viewing); setViewing(null); }}>
-              <FiEdit2 /> Edit
-            </button>
           </div>
         </div>
         <div className="page-body fade-in">
           <div className="card" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: 'var(--radius-lg)',
-                background: 'linear-gradient(135deg, var(--color-accent), #3b82f6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.5rem', fontWeight: 700, color: '#ffffff'
-              }}>
-                {viewing.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 'var(--radius-lg)',
+                  background: 'linear-gradient(135deg, var(--color-accent), #3b82f6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1.5rem', fontWeight: 700, color: '#ffffff'
+                }}>
+                  {viewing.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+                <div>
+                  <h2>{viewing.name}</h2>
+                  <span className="badge badge-accent">{viewing.id}</span>
+                  <span className="badge badge-info" style={{ marginLeft: 8 }}>{viewing.gender}</span>
+                </div>
               </div>
-              <div>
-                <h2>{viewing.name}</h2>
-                <span className="badge badge-accent">{viewing.id}</span>
-                <span className="badge badge-info" style={{ marginLeft: 8 }}>{viewing.gender}</span>
-              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => { openEdit(viewing); setViewing(null); }}>
+                <FiEdit2 /> Edit
+              </button>
             </div>
 
             <div className="detail-grid">
@@ -151,6 +152,8 @@ export default function Patients() {
               </div>
             )}
           </div>
+
+
         </div>
       </>
     );
@@ -158,23 +161,27 @@ export default function Patients() {
 
   return (
     <>
-      <div className="page-header">
-        <h1>Patients</h1>
-        <button className="btn btn-primary" onClick={openAdd}><FiPlus /> Add Patient</button>
-      </div>
+      <PageHeader title="Patients" />
 
       <div className="page-body fade-in">
-        <div className="toolbar">
-          <div className="search-box">
-            <FiSearch className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search by name, ID, or phone..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+        <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{filtered.length} patients</span>
           </div>
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>{filtered.length} patients</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="search-box" style={{ maxWidth: 400 }}>
+              <FiSearch className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search by name, ID, or phone..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <button className="btn btn-primary" onClick={openAdd}><FiPlus /> Add Patient</button>
+            </div>
+          </div>
         </div>
 
         {filtered.length === 0 ? (

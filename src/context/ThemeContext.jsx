@@ -1,0 +1,58 @@
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useData } from './DataContext';
+
+const ThemeContext = createContext(null);
+
+const LS_KEY = 'hms_theme';
+
+function getSystemTheme() {
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(resolved) {
+  document.documentElement.setAttribute('data-theme', resolved);
+}
+
+export function ThemeProvider({ children }) {
+  const { themePreference, updateTheme } = useData();
+
+  const [theme, setThemeState] = useState(() => {
+    const saved = (() => { try { return localStorage.getItem(LS_KEY); } catch {} })();
+    if (saved === 'dark' || saved === 'light' || saved === 'system') return saved;
+    if (themePreference === 'dark' || themePreference === 'light' || themePreference === 'system') return themePreference;
+    return 'light';
+  });
+
+  const setTheme = useCallback((newTheme) => {
+    setThemeState(newTheme);
+    updateTheme(newTheme);
+    try { localStorage.setItem(LS_KEY, newTheme); } catch {}
+  }, [updateTheme]);
+
+  useEffect(() => {
+    const resolved = theme === 'system' ? getSystemTheme() : theme;
+    applyTheme(resolved);
+
+    if (theme !== 'system') return;
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => applyTheme(e.matches ? 'dark' : 'light');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
+
+  const resolvedTheme = theme === 'system' ? getSystemTheme() : theme;
+
+  return (
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
+  return ctx;
+}

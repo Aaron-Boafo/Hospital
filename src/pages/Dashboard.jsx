@@ -1,6 +1,7 @@
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { FiUsers, FiCalendar, FiDollarSign, FiTrendingUp } from 'react-icons/fi';
+import PageHeader from '../components/PageHeader';
 
 export default function Dashboard() {
   const { stats, activities, appointments } = useData();
@@ -23,15 +24,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1>Dashboard</h1>
-          <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: 2 }}>
-            Welcome back, {user?.name}
-          </p>
-        </div>
-        <span className="badge badge-accent">{user?.role}</span>
-      </div>
+      <PageHeader title="Dashboard" subtitle={`Welcome back, ${user?.name}`} />
 
       <div className="page-body fade-in">
         <div className="stats-grid">

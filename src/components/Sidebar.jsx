@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, ROLE_ACCESS } from '../context/AuthContext';
 import {
   FiGrid, FiUsers, FiCalendar, FiUserPlus,
-  FiDollarSign, FiLogOut, FiMenu, FiX, FiZap
+  FiDollarSign, FiLogOut, FiMenu, FiX, FiZap, FiSettings, FiUser, FiActivity, FiShield, FiBarChart2, FiClipboard, FiFileText, FiPackage
 } from 'react-icons/fi';
 import { useState } from 'react';
 
@@ -10,8 +10,17 @@ const NAV_ITEMS = [
   { to: '/', icon: <FiGrid />, label: 'Dashboard', feature: 'dashboard' },
   { to: '/patients', icon: <FiUsers />, label: 'Patients', feature: 'patients' },
   { to: '/appointments', icon: <FiCalendar />, label: 'Appointments', feature: 'appointments' },
-  { to: '/doctors', icon: <FiUserPlus />, label: 'Doctors', feature: 'doctors' },
+  { to: '/doctors', icon: <FiShield />, label: 'Doctors', feature: 'doctors' },
   { to: '/billing', icon: <FiDollarSign />, label: 'Billing', feature: 'billing' },
+  { to: '/decision-support', icon: <FiActivity />, label: 'AI Diagnosis', feature: 'clinical' },
+  { to: '/staff', icon: <FiUserPlus />, label: 'Staff', feature: 'staff' },
+  { to: '/reports', icon: <FiBarChart2 />, label: 'Reports', feature: 'reports' },
+  { to: '/laboratory', icon: <FiFileText />, label: 'Laboratory', feature: 'laboratory' },
+  { to: '/pharmacy', icon: <FiPackage />, label: 'Pharmacy', feature: 'pharmacy' },
+  { to: '/prescriptions', icon: <FiClipboard />, label: 'Prescriptions', feature: 'prescriptions' },
+  { to: '/beds', icon: <FiGrid />, label: 'Bed Space', feature: 'beds' },
+  { to: '/profile', icon: <FiUser />, label: 'Profile', feature: null },
+  { to: '/settings', icon: <FiSettings />, label: 'Settings', feature: null },
 ];
 
 export default function Sidebar() {
@@ -24,7 +33,7 @@ export default function Sidebar() {
     navigate('/login');
   };
 
-  const visibleItems = NAV_ITEMS.filter(item => hasAccess(item.feature));
+  const visibleItems = NAV_ITEMS.filter(item => !item.feature || hasAccess(item.feature));
 
   return (
     <>
@@ -59,19 +68,10 @@ export default function Sidebar() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="user-avatar">
-              {user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
-            </div>
-            <div className="user-info">
-              <div className="user-name">{user?.name}</div>
-              <div className="user-role">{user?.role}</div>
-            </div>
-          </div>
           <button
-            className="btn btn-ghost"
+            className="btn logout-btn"
             onClick={handleLogout}
-            style={{ width: '100%', marginTop: 10, justifyContent: 'center' }}
+            style={{ width: '100%', justifyContent: 'center' }}
           >
             <FiLogOut /> Logout
           </button>
