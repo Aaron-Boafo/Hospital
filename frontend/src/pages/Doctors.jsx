@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { useDoctors, useCreateDoctor, useUpdateDoctor, useToggleDoctorActive } from '../hooks';
+import { DEPARTMENTS } from '../services/doctors';
 import { FiSearch, FiPlus, FiEdit2, FiX, FiUserPlus, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
-const DEPARTMENTS = ['General Medicine', 'Pediatrics', 'Cardiology', 'Orthopedics', 'Neurology', 'Dermatology', 'ENT', 'Gynecology', 'Ophthalmology'];
 const INITIAL_FORM = { name: '', department: DEPARTMENTS[0], phone: '', email: '' };
 
+const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
+
 export default function Doctors() {
-  const { doctors, addDoctor, updateDoctor, toggleDoctorActive } = useData();
+  const { data: doctors = [], isLoading, error, refetch } = useDoctors();
+  const createMutation = useCreateDoctor();
+  const updateMutation = useUpdateDoctor();
+  const toggleMutation = useToggleDoctorActive();
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -28,35 +33,53 @@ export default function Doctors() {
 
   const openEdit = (doctor) => {
     setEditing(doctor.id);
-    setForm({ name: doctor.name, department: doctor.department, phone: doctor.phone, email: doctor.email });
+    setForm({ name: doctor.name, department: doctor.department, phone: doctor.phone || '', email: doctor.email || '' });
     setShowModal(true);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.name || !form.department) return;
-    if (editing) {
-      updateDoctor(editing, form);
-    } else {
-      addDoctor(form);
-    }
+  const closeModal = () => {
     setShowModal(false);
     setForm(INITIAL_FORM);
     setEditing(null);
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.name || !form.department) return;
+    const input = {
+      name: form.name,
+      department: form.department,
+      phone: form.phone || undefined,
+      email: form.email || undefined,
+    };
+    if (editing) {
+      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+    } else {
+      createMutation.mutate(input, { onSuccess: closeModal });
+    }
+  };
+
   const allDepartments = [...new Set(doctors.map(d => d.department))];
+
+  const submitError = editing ? updateMutation.error : createMutation.error;
+  const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   return (
     <>
       <PageHeader title="Doctors" />
 
       <div className="page-body fade-in">
+        {error && (
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span>Failed to load doctors: {error.message}</span>
+            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 180 }} value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
               <option>All</option>
-              {allDepartments.map(d => <option key={d}>{d}</option>)}
+              {allDepartments.map(d => <option key={d}>{titleCase(d)}</option>)}
             </select>
             <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{filtered.length} doctors</span>
           </div>
@@ -71,7 +94,7 @@ export default function Doctors() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {!isLoading && filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><FiUserPlus /></div>
             <h3>No doctors found</h3>
@@ -79,6 +102,9 @@ export default function Doctors() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+            {isLoading && (
+              <p className="text-muted" style={{ padding: 24 }}>Loading…</p>
+            )}
             {filtered.map(d => (
               <div key={d.id} className="card" style={{ opacity: d.active ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -93,7 +119,7 @@ export default function Doctors() {
                     </div>
                     <div>
                       <h4 style={{ fontSize: '0.95rem' }}>{d.name}</h4>
-                      <span className="badge badge-accent">{d.department}</span>
+                      <span className="badge badge-accent">{titleCase(d.department)}</span>
                     </div>
                   </div>
                   <span className={`badge ${d.active ? 'badge-success' : 'badge-danger'}`}>
@@ -114,7 +140,7 @@ export default function Doctors() {
                   </button>
                   <button
                     className={`btn btn-sm ${d.active ? 'btn-danger' : 'btn-success'}`}
-                    onClick={() => toggleDoctorActive(d.id)}
+                    onClick={() => toggleMutation.mutate({ id: d.id, active: !d.active })}
                   >
                     {d.active ? <><FiToggleLeft /> Deactivate</> : <><FiToggleRight /> Activate</>}
                   </button>
@@ -134,6 +160,11 @@ export default function Doctors() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
+                {submitError && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {submitError.message}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Full Name *</label>
                   <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Dr. Jane Smith" required />
@@ -141,7 +172,7 @@ export default function Doctors() {
                 <div className="form-group">
                   <label>Department *</label>
                   <select className="form-control" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} required>
-                    {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{titleCase(d)}</option>)}
                   </select>
                 </div>
                 <div className="form-row">
@@ -157,7 +188,7 @@ export default function Doctors() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Save Changes' : 'Add Doctor'}</button>
+                <button type="submit" className="btn btn-primary" disabled={mutating}>{mutating ? 'Saving…' : (editing ? 'Save Changes' : 'Add Doctor')}</button>
               </div>
             </form>
           </div>

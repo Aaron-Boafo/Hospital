@@ -1,0 +1,7 @@
+export * from './patients'
+export * from './doctors'
+export * from './appointments'
+export * from './billing'
+export * from './medicines'
+export * from './prescriptions'
+export * from './activities'

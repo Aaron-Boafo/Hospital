@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useData } from '../context/DataContext';
+import { useAppointments, usePatients, useDoctors, useCreateAppointment, useUpdateAppointment, useUpdateAppointmentStatus, useDeleteAppointment } from '../hooks';
 import {
   FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiCalendar, FiCheck, FiXCircle,
   FiList, FiChevronLeft, FiChevronRight, FiClock, FiUser
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
-const INITIAL_FORM = { patientId: '', patientName: '', doctorId: '', doctorName: '', date: '', time: '', notes: '' };
+const INITIAL_FORM = { patientId: '', doctorId: '', date: '', time: '', notes: '' };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
 
 function CalendarView({ appointments, onDayClick, selectedDate }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -79,13 +81,13 @@ function CalendarView({ appointments, onDayClick, selectedDate }) {
                 {apts.slice(0, 3).map(a => (
                   <div key={a.id} style={{
                     fontSize: '0.62rem', padding: '2px 4px', borderRadius: 'var(--radius-sm)',
-                    background: a.status === 'Completed' ? 'var(--color-success-bg)' :
-                      a.status === 'Cancelled' ? 'var(--color-danger-bg)' : 'var(--color-info-bg)',
-                    color: a.status === 'Completed' ? 'var(--color-success)' :
-                      a.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-info)',
+                    background: a.status === 'COMPLETED' ? 'var(--color-success-bg)' :
+                      a.status === 'CANCELLED' ? 'var(--color-danger-bg)' : 'var(--color-info-bg)',
+                    color: a.status === 'COMPLETED' ? 'var(--color-success)' :
+                      a.status === 'CANCELLED' ? 'var(--color-danger)' : 'var(--color-info)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.4,
                   }}>
-                    {a.time} {a.patientName.split(' ')[0]}
+                    {a.time} {a.patient.name.split(' ')[0]}
                   </div>
                 ))}
                 {apts.length > 3 && (
@@ -122,27 +124,27 @@ function DayDetail({ date, appointments, onClose, onEdit, onDelete, onStatusChan
           {apts.sort((a, b) => a.time.localeCompare(b.time)).map(a => (
             <div key={a.id} style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px',
-              borderLeft: `3px solid ${a.status === 'Completed' ? 'var(--color-success)' : a.status === 'Cancelled' ? 'var(--color-danger)' : 'var(--color-info)'}`,
+              borderLeft: `3px solid ${a.status === 'COMPLETED' ? 'var(--color-success)' : a.status === 'CANCELLED' ? 'var(--color-danger)' : 'var(--color-info)'}`,
               background: 'var(--color-bg-tertiary)', borderRadius: '0 var(--radius-md) var(--radius-md) 0',
             }}>
               <div style={{ textAlign: 'center', minWidth: 50 }}>
                 <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{a.time}</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{a.patientName}</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{a.patient.name}</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <FiUser style={{ fontSize: '0.7rem' }} /> {a.doctorName}
+                  <FiUser style={{ fontSize: '0.7rem' }} /> {a.doctor.name}
                 </div>
                 {a.notes && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>{a.notes}</div>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className={`badge ${a.status === 'Completed' ? 'badge-success' : a.status === 'Cancelled' ? 'badge-danger' : 'badge-info'}`}>
-                  {a.status}
+                <span className={`badge ${a.status === 'COMPLETED' ? 'badge-success' : a.status === 'CANCELLED' ? 'badge-danger' : 'badge-info'}`}>
+                  {titleCase(a.status)}
                 </span>
-                {a.status === 'Scheduled' && (
+                {a.status === 'SCHEDULED' && (
                   <>
-                    <button className="btn btn-success btn-sm" onClick={() => onStatusChange(a.id, 'Completed')} title="Complete"><FiCheck /></button>
-                    <button className="btn btn-danger btn-sm" onClick={() => onStatusChange(a.id, 'Cancelled')} title="Cancel"><FiXCircle /></button>
+                    <button className="btn btn-success btn-sm" onClick={() => onStatusChange(a.id, 'COMPLETED')} title="Complete"><FiCheck /></button>
+                    <button className="btn btn-danger btn-sm" onClick={() => onStatusChange(a.id, 'CANCELLED')} title="Cancel"><FiXCircle /></button>
                   </>
                 )}
                 <button className="btn btn-ghost btn-sm" onClick={() => onEdit(a)} title="Edit"><FiEdit2 /></button>
@@ -157,7 +159,13 @@ function DayDetail({ date, appointments, onClose, onEdit, onDelete, onStatusChan
 }
 
 export default function Appointments() {
-  const { appointments, patients, doctors, addAppointment, updateAppointment, deleteAppointment } = useData();
+  const { data: appointments = [], isLoading, error, refetch } = useAppointments();
+  const { data: patients = [] } = usePatients();
+  const { data: doctors = [] } = useDoctors();
+  const createMutation = useCreateAppointment();
+  const updateMutation = useUpdateAppointment();
+  const statusMutation = useUpdateAppointmentStatus();
+  const deleteMutation = useDeleteAppointment();
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
   const [statusFilter, setStatusFilter] = useState('All');
@@ -170,8 +178,8 @@ export default function Appointments() {
   const activeDoctors = doctors.filter(d => d.active);
 
   const filtered = appointments.filter(a => {
-    const matchSearch = a.patientName.toLowerCase().includes(search.toLowerCase()) ||
-      a.doctorName.toLowerCase().includes(search.toLowerCase()) ||
+    const matchSearch = a.patient.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.doctor.name.toLowerCase().includes(search.toLowerCase()) ||
       a.id.toLowerCase().includes(search.toLowerCase());
     const matchDate = !dateFilter || a.date === dateFilter;
     const matchStatus = statusFilter === 'All' || a.status === statusFilter;
@@ -187,49 +195,60 @@ export default function Appointments() {
   const openEdit = (apt) => {
     setEditing(apt.id);
     setForm({
-      patientId: apt.patientId, patientName: apt.patientName,
-      doctorId: apt.doctorId, doctorName: apt.doctorName,
+      patientId: apt.patient.id,
+      doctorId: apt.doctor.id,
       date: apt.date, time: apt.time, notes: apt.notes || ''
     });
     setShowModal(true);
   };
 
   const handlePatientChange = (e) => {
-    const patient = patients.find(p => p.id === e.target.value);
-    setForm(f => ({ ...f, patientId: patient?.id || '', patientName: patient?.name || '' }));
+    setForm(f => ({ ...f, patientId: e.target.value }));
   };
 
   const handleDoctorChange = (e) => {
-    const doctor = activeDoctors.find(d => d.id === e.target.value);
-    setForm(f => ({ ...f, doctorId: doctor?.id || '', doctorName: doctor?.name || '' }));
+    setForm(f => ({ ...f, doctorId: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.patientId || !form.doctorId || !form.date || !form.time) return;
-    if (editing) {
-      updateAppointment(editing, form);
-    } else {
-      addAppointment(form);
-    }
+  const closeModal = () => {
     setShowModal(false);
     setForm(INITIAL_FORM);
     setEditing(null);
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.patientId || !form.doctorId || !form.date || !form.time) return;
+    const input = { patientId: form.patientId, doctorId: form.doctorId, date: form.date, time: form.time, notes: form.notes || undefined };
+    if (editing) {
+      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+    } else {
+      createMutation.mutate(input, { onSuccess: closeModal });
+    }
+  };
+
   const handleStatusChange = (id, status) => {
-    updateAppointment(id, { status });
+    statusMutation.mutate({ id, status });
   };
 
   const handleDeleteApt = (id) => {
-    if (confirm('Delete this appointment?')) deleteAppointment(id);
+    if (confirm('Delete this appointment?')) deleteMutation.mutate(id);
   };
+
+  const submitError = editing ? updateMutation.error : createMutation.error;
+  const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   return (
     <>
       <PageHeader title="Appointments" />
 
       <div className="page-body fade-in">
+        {error && (
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span>Failed to load appointments: {error.message}</span>
+            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <input
@@ -240,10 +259,10 @@ export default function Appointments() {
               onChange={e => setDateFilter(e.target.value)}
             />
             <select className="form-control" style={{ width: 150 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option>All</option>
-              <option>Scheduled</option>
-              <option>Completed</option>
-              <option>Cancelled</option>
+              <option value="All">All</option>
+              <option value="SCHEDULED">Scheduled</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
             </select>
             <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
               {view === 'table' ? `${filtered.length} results` : `${appointments.length} total`}
@@ -265,7 +284,7 @@ export default function Appointments() {
         </div>
 
         {view === 'table' ? (
-          filtered.length === 0 ? (
+          !isLoading && filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><FiCalendar /></div>
               <h3>No appointments found</h3>
@@ -287,28 +306,31 @@ export default function Appointments() {
                   </tr>
                 </thead>
                 <tbody>
+                  {isLoading && (
+                    <tr><td colSpan={8} className="text-muted" style={{ textAlign: 'center', padding: 24 }}>Loading…</td></tr>
+                  )}
                   {filtered.map(a => (
                     <tr key={a.id}>
                       <td><span className="badge badge-accent">{a.id}</span></td>
                       <td>{a.date}</td>
                       <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{a.time}</td>
-                      <td>{a.patientName}</td>
-                      <td>{a.doctorName}</td>
+                      <td>{a.patient.name}</td>
+                      <td>{a.doctor.name}</td>
                       <td>
                         <span className={`badge ${
-                          a.status === 'Completed' ? 'badge-success' :
-                          a.status === 'Cancelled' ? 'badge-danger' : 'badge-info'
-                        }`}>{a.status}</span>
+                          a.status === 'COMPLETED' ? 'badge-success' :
+                          a.status === 'CANCELLED' ? 'badge-danger' : 'badge-info'
+                        }`}>{titleCase(a.status)}</span>
                       </td>
                       <td style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes || '—'}</td>
                       <td>
                         <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
-                          {a.status === 'Scheduled' && (
+                          {a.status === 'SCHEDULED' && (
                             <>
-                              <button className="btn btn-success btn-sm" onClick={() => handleStatusChange(a.id, 'Completed')} title="Complete">
+                              <button className="btn btn-success btn-sm" onClick={() => handleStatusChange(a.id, 'COMPLETED')} title="Complete">
                                 <FiCheck />
                               </button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleStatusChange(a.id, 'Cancelled')} title="Cancel">
+                              <button className="btn btn-danger btn-sm" onClick={() => handleStatusChange(a.id, 'CANCELLED')} title="Cancel">
                                 <FiXCircle />
                               </button>
                             </>
@@ -353,6 +375,11 @@ export default function Appointments() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
+                {submitError && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {submitError.message}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Patient *</label>
                   <select className="form-control" value={form.patientId} onChange={handlePatientChange} required>
@@ -364,7 +391,7 @@ export default function Appointments() {
                   <label>Doctor *</label>
                   <select className="form-control" value={form.doctorId} onChange={handleDoctorChange} required>
                     <option value="">Select a doctor</option>
-                    {activeDoctors.map(d => <option key={d.id} value={d.id}>{d.name} — {d.department}</option>)}
+                    {activeDoctors.map(d => <option key={d.id} value={d.id}>{d.name} — {titleCase(d.department)}</option>)}
                   </select>
                 </div>
                 <div className="form-row">
@@ -384,7 +411,7 @@ export default function Appointments() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Save Changes' : 'Schedule'}</button>
+                <button type="submit" className="btn btn-primary" disabled={mutating}>{mutating ? 'Saving…' : (editing ? 'Save Changes' : 'Schedule')}</button>
               </div>
             </form>
           </div>

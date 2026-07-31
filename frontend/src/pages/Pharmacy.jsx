@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { useMedicines, useCreateMedicine, useUpdateMedicine, useDeleteMedicine } from '../hooks';
+import { MEDICINE_CATEGORIES } from '../services/medicines';
 import {
   FiSearch, FiPlus, FiEdit2, FiTrash2, FiX, FiPackage,
   FiAlertTriangle, FiClock, FiDollarSign
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
-const CATEGORIES = ['Antibiotics', 'Analgesics', 'Antihypertensives', 'Antidiabetics', 'Antacids', 'Vitamins', 'Dermatological', 'Respiratory', 'Cardiovascular', 'Other'];
-const INITIAL_FORM = { name: '', category: CATEGORIES[0], unitPrice: '', quantity: '', reorderLevel: '', expiryDate: '', supplier: '' };
+const INITIAL_FORM = { name: '', category: MEDICINE_CATEGORIES[0], unitPrice: '', quantity: '', reorderLevel: '', expiryDate: '', supplier: '' };
+
+const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
 
 export default function Pharmacy() {
-  const { medicines, addMedicine, updateMedicine, deleteMedicine } = useData();
+  const { data: medicines = [], isLoading, error, refetch } = useMedicines();
+  const createMutation = useCreateMedicine();
+  const updateMutation = useUpdateMedicine();
+  const deleteMutation = useDeleteMedicine();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [showModal, setShowModal] = useState(false);
@@ -34,49 +39,57 @@ export default function Pharmacy() {
     setShowModal(true);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.name || !form.unitPrice || form.quantity === '') return;
-    const data = {
-      ...form, unitPrice: parseFloat(form.unitPrice), quantity: parseInt(form.quantity),
-      reorderLevel: parseInt(form.reorderLevel) || 0,
-    };
-    if (editing) {
-      updateMedicine(editing, data);
-    } else {
-      addMedicine(data);
-    }
+  const closeModal = () => {
     setShowModal(false);
     setForm(INITIAL_FORM);
     setEditing(null);
   };
 
-  const handleDelete = (id) => {
-    if (confirm('Delete this medicine?')) deleteMedicine(id);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.name || !form.unitPrice || form.quantity === '') return;
+    const input = {
+      name: form.name,
+      category: form.category,
+      unitPrice: parseFloat(form.unitPrice),
+      quantity: parseInt(form.quantity),
+      reorderLevel: parseInt(form.reorderLevel) || 0,
+      expiryDate: form.expiryDate || undefined,
+      supplier: form.supplier || undefined,
+    };
+    if (editing) {
+      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+    } else {
+      createMutation.mutate(input, { onSuccess: closeModal });
+    }
   };
 
-  const isLowStock = (m) => m.quantity <= m.reorderLevel && m.reorderLevel > 0;
-  const isExpired = (m) => m.expiryDate && m.expiryDate < new Date().toISOString().slice(0, 10);
-  const isExpiringSoon = (m) => {
-    if (!m.expiryDate) return false;
-    const warn = new Date();
-    warn.setMonth(warn.getMonth() + 1);
-    return m.expiryDate <= warn.toISOString().slice(0, 10) && !isExpired(m);
+  const handleDelete = (id) => {
+    if (confirm('Delete this medicine?')) deleteMutation.mutate(id);
   };
+
+  const submitError = editing ? updateMutation.error : createMutation.error;
+  const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   return (
     <>
       <PageHeader title="Pharmacy" subtitle="Medicine catalog and inventory management" />
 
       <div className="page-body fade-in">
+        {error && (
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span>Failed to load medicines: {error.message}</span>
+            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 180 }} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
               <option>All</option>
-              {categories.map(c => <option key={c}>{c}</option>)}
+              {categories.map(c => <option key={c}>{titleCase(c)}</option>)}
             </select>
             <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-              {filtered.length} items • {medicines.filter(m => isLowStock(m)).length} low stock
+              {filtered.length} items • {medicines.filter(m => m.isLowStock).length} low stock
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -90,7 +103,7 @@ export default function Pharmacy() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {!isLoading && filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><FiPackage /></div>
             <h3>No medicines found</h3>
@@ -98,23 +111,26 @@ export default function Pharmacy() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {isLoading && (
+              <p className="text-muted" style={{ padding: 24 }}>Loading…</p>
+            )}
             {filtered.map(m => (
               <div key={m.id} className="card" style={{
-                border: isExpired(m) ? '1px solid var(--color-danger)' :
-                  isLowStock(m) ? '1px solid var(--color-warning)' : undefined,
+                border: m.isExpired ? '1px solid var(--color-danger)' :
+                  m.isLowStock ? '1px solid var(--color-warning)' : undefined,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
                     <h4 style={{ fontSize: '0.9rem', marginBottom: 2 }}>{m.name}</h4>
-                    <span className="badge badge-accent">{m.category}</span>
+                    <span className="badge badge-accent">{titleCase(m.category)}</span>
                   </div>
-                  {isExpired(m) && <span className="badge badge-danger" style={{ fontSize: '0.7rem' }}>EXPIRED</span>}
-                  {isExpiringSoon(m) && <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Expiring</span>}
+                  {m.isExpired && <span className="badge badge-danger" style={{ fontSize: '0.7rem' }}>EXPIRED</span>}
+                  {m.isExpiringSoon && <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Expiring</span>}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: 12 }}>
                   <div><FiDollarSign style={{ verticalAlign: 'middle', marginRight: 4 }} /> GH₵{m.unitPrice}</div>
-                  <div style={{ color: isLowStock(m) ? 'var(--color-danger)' : 'var(--color-text-secondary)', fontWeight: isLowStock(m) ? 600 : 400 }}>
+                  <div style={{ color: m.isLowStock ? 'var(--color-danger)' : 'var(--color-text-secondary)', fontWeight: m.isLowStock ? 600 : 400 }}>
                     <FiPackage style={{ verticalAlign: 'middle', marginRight: 4 }} /> Stock: {m.quantity}
                   </div>
                   <div><FiClock style={{ verticalAlign: 'middle', marginRight: 4 }} /> {m.expiryDate || 'No expiry'}</div>
@@ -140,6 +156,11 @@ export default function Pharmacy() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
+                {submitError && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {submitError.message}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Medicine Name *</label>
                   <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Amoxicillin 500mg" required />
@@ -148,7 +169,7 @@ export default function Pharmacy() {
                   <div className="form-group">
                     <label>Category *</label>
                     <select className="form-control" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                      {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                      {MEDICINE_CATEGORIES.map(c => <option key={c} value={c}>{titleCase(c)}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
@@ -179,7 +200,7 @@ export default function Pharmacy() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Save Changes' : 'Add Medicine'}</button>
+                <button type="submit" className="btn btn-primary" disabled={mutating}>{mutating ? 'Saving…' : (editing ? 'Save Changes' : 'Add Medicine')}</button>
               </div>
             </form>
           </div>

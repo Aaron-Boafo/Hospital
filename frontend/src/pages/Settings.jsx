@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   FiCheck, FiSliders, FiBell, FiDatabase,
   FiSun, FiMoon, FiMonitor, FiTrash2,
@@ -6,7 +7,7 @@ import {
   FiRefreshCw, FiClock, FiUser, FiFileText,
   FiInfo, FiAlertCircle, FiCheckCircle
 } from 'react-icons/fi';
-import { useData } from '../context/DataContext';
+import { useActivities, usePatients, useDoctors, useAppointments, useBills } from '../hooks';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import PageHeader from '../components/PageHeader';
@@ -37,7 +38,12 @@ const DATE_FORMAT_OPTIONS = [
 ];
 
 export default function Settings() {
-  const { activities, patients, doctors, appointments, bills } = useData();
+  const { data: activities = [], isLoading: activitiesLoading } = useActivities();
+  const { data: patients = [] } = usePatients();
+  const { data: doctors = [] } = useDoctors();
+  const { data: appointments = [] } = useAppointments();
+  const { data: bills = [] } = useBills();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('general');
@@ -95,9 +101,11 @@ export default function Settings() {
 
   const handleClearCache = () => {
     if (!confirm('This will clear all cached data and reload the page. Are you sure?')) return;
+    queryClient.clear();
     localStorage.removeItem('hms_user');
     localStorage.removeItem('hms_data');
     localStorage.removeItem('hms_settings');
+    localStorage.removeItem('hms_backup');
     setCacheMsg('Cache cleared! Reloading...');
     setTimeout(() => window.location.reload(), 1500);
   };
@@ -327,11 +335,13 @@ export default function Settings() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {activities.length === 0 ? (
+                {activitiesLoading ? (
+                  <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', padding: '12px 0' }}>Loading…</p>
+                ) : activities.length === 0 ? (
                   <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', padding: '12px 0' }}>No activity recorded yet</p>
                 ) : (
                   activities.slice(0, 10).map((entry, i) => {
-                    const { icon: IconComp, color } = activityIcon(entry.type);
+                    const { icon: IconComp, color } = activityIcon(entry.type.toLowerCase());
                     return (
                       <div key={entry.id} style={{
                         display: 'flex', alignItems: 'center', gap: 12,

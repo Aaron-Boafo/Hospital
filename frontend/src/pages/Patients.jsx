@@ -1,23 +1,34 @@
-import { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { useEffect, useState } from 'react';
+import { usePatients, useAppointments, useCreatePatient, useUpdatePatient, useDeletePatient } from '../hooks';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiEye, FiX, FiUser } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
-const INITIAL_FORM = { name: '', dob: '', gender: 'Male', phone: '', address: '', emergencyContact: '' };
+const INITIAL_FORM = { name: '', dob: '', gender: 'MALE', phone: '', address: '', emergencyContact: '' };
+
+function useDebouncedValue(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
 
 export default function Patients() {
-  const { patients, appointments, addPatient, updatePatient, deletePatient } = useData();
   const [search, setSearch] = useState('');
+  const [now] = useState(() => Date.now());
+  const debouncedSearch = useDebouncedValue(search);
+  const { data: patients = [], isLoading, error, refetch } = usePatients(debouncedSearch || undefined);
+  const { data: appointments = [] } = useAppointments();
+  const createMutation = useCreatePatient();
+  const updateMutation = useUpdatePatient();
+  const deleteMutation = useDeletePatient();
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
-
-  const filtered = patients.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.id.toLowerCase().includes(search.toLowerCase()) ||
-    p.phone.includes(search)
-  );
 
   const openAdd = () => {
     setEditing(null);
@@ -27,39 +38,52 @@ export default function Patients() {
 
   const openEdit = (patient) => {
     setEditing(patient.id);
-    setForm({ name: patient.name, dob: patient.dob, gender: patient.gender, phone: patient.phone, address: patient.address, emergencyContact: patient.emergencyContact });
+    setForm({ name: patient.name, dob: patient.dob || '', gender: patient.gender || 'MALE', phone: patient.phone, address: patient.address || '', emergencyContact: patient.emergencyContact || '' });
     setShowModal(true);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.name || !form.phone) return;
-    if (editing) {
-      updatePatient(editing, form);
-    } else {
-      addPatient(form);
-    }
+  const closeModal = () => {
     setShowModal(false);
     setForm(INITIAL_FORM);
     setEditing(null);
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.name || !form.phone) return;
+    const input = {
+      name: form.name,
+      phone: form.phone,
+      dob: form.dob || undefined,
+      gender: form.gender,
+      address: form.address || undefined,
+      emergencyContact: form.emergencyContact || undefined,
+    };
+    if (editing) {
+      updateMutation.mutate({ id: editing, input }, { onSuccess: closeModal });
+    } else {
+      createMutation.mutate(input, { onSuccess: closeModal });
+    }
+  };
+
   const handleDelete = (id) => {
     if (confirm('Are you sure you want to delete this patient?')) {
-      deletePatient(id);
-      if (viewing?.id === id) setViewing(null);
+      deleteMutation.mutate(id, { onSuccess: () => { if (viewing?.id === id) setViewing(null); } });
     }
   };
 
   const patientAppointments = viewing
-    ? appointments.filter(a => a.patientId === viewing.id)
+    ? appointments.filter(a => a.patient.id === viewing.id)
     : [];
 
   const getAge = (dob) => {
     if (!dob) return '—';
-    const diff = Date.now() - new Date(dob).getTime();
+    const diff = now - new Date(dob).getTime();
     return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000)) + ' yrs';
   };
+
+  const submitError = editing ? updateMutation.error : createMutation.error;
+  const mutating = editing ? updateMutation.isPending : createMutation.isPending;
 
   // Detail view
   if (viewing) {
@@ -86,7 +110,7 @@ export default function Patients() {
                 <div>
                   <h2>{viewing.name}</h2>
                   <span className="badge badge-accent">{viewing.id}</span>
-                  <span className="badge badge-info" style={{ marginLeft: 8 }}>{viewing.gender}</span>
+                  <span className="badge badge-info" style={{ marginLeft: 8 }}>{titleCase(viewing.gender)}</span>
                 </div>
               </div>
               <button className="btn btn-primary btn-sm" onClick={() => { openEdit(viewing); setViewing(null); }}>
@@ -138,10 +162,10 @@ export default function Patients() {
                       <tr key={a.id}>
                         <td>{a.date}</td>
                         <td>{a.time}</td>
-                        <td>{a.doctorName}</td>
+                        <td>{a.doctor.name}</td>
                         <td>
-                          <span className={`badge ${a.status === 'Completed' ? 'badge-success' : a.status === 'Cancelled' ? 'badge-danger' : 'badge-info'}`}>
-                            {a.status}
+                          <span className={`badge ${a.status === 'COMPLETED' ? 'badge-success' : a.status === 'CANCELLED' ? 'badge-danger' : 'badge-info'}`}>
+                            {titleCase(a.status)}
                           </span>
                         </td>
                         <td>{a.notes || '—'}</td>
@@ -164,9 +188,15 @@ export default function Patients() {
       <PageHeader title="Patients" />
 
       <div className="page-body fade-in">
+        {error && (
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span>Failed to load patients: {error.message}</span>
+            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{filtered.length} patients</span>
+            <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{patients.length} patients</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div className="search-box" style={{ maxWidth: 400 }}>
@@ -184,7 +214,7 @@ export default function Patients() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {!isLoading && patients.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><FiUser /></div>
             <h3>No patients found</h3>
@@ -205,12 +235,15 @@ export default function Patients() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => (
+                {isLoading && (
+                  <tr><td colSpan={7} className="text-muted" style={{ textAlign: 'center', padding: 24 }}>Loading…</td></tr>
+                )}
+                {patients.map(p => (
                   <tr key={p.id}>
                     <td><span className="badge badge-accent">{p.id}</span></td>
                     <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.name}</td>
                     <td>{getAge(p.dob)}</td>
-                    <td>{p.gender}</td>
+                    <td>{titleCase(p.gender)}</td>
                     <td>{p.phone}</td>
                     <td>{p.createdAt}</td>
                     <td>
@@ -244,6 +277,11 @@ export default function Patients() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
+                {submitError && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {submitError.message}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Full Name *</label>
                   <input className="form-control" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Enter full name" required />
@@ -256,9 +294,9 @@ export default function Patients() {
                   <div className="form-group">
                     <label>Gender</label>
                     <select className="form-control" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
-                      <option>Male</option>
-                      <option>Female</option>
-                      <option>Other</option>
+                      <option>MALE</option>
+                      <option>FEMALE</option>
+                      <option>OTHER</option>
                     </select>
                   </div>
                 </div>
@@ -277,7 +315,7 @@ export default function Patients() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Save Changes' : 'Register Patient'}</button>
+                <button type="submit" className="btn btn-primary" disabled={mutating}>{mutating ? 'Saving…' : (editing ? 'Save Changes' : 'Register Patient')}</button>
               </div>
             </form>
           </div>

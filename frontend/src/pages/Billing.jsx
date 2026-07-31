@@ -1,12 +1,18 @@
 import { useState, useRef } from 'react';
-import { useData } from '../context/DataContext';
+import { useBills, usePatients, useCreateBill, useRecordPayment } from '../hooks';
+import { PAYMENT_METHODS } from '../services/billing';
 import { FiSearch, FiPlus, FiX, FiDollarSign, FiPrinter, FiTrash2, FiCreditCard } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
-const INITIAL_FORM = { patientId: '', patientName: '', items: [{ description: '', amount: '' }] };
+const INITIAL_FORM = { patientId: '', items: [{ description: '', amount: '' }] };
+
+const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
 
 export default function Billing() {
-  const { bills, patients, addBill, recordPayment } = useData();
+  const { data: bills = [], isLoading, error, refetch } = useBills();
+  const { data: patients = [] } = usePatients();
+  const createMutation = useCreateBill();
+  const payMutation = useRecordPayment();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -14,19 +20,17 @@ export default function Billing() {
   const [showReceipt, setShowReceipt] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [payAmount, setPayAmount] = useState('');
-  const [payMethod, setPayMethod] = useState('Cash');
+  const [payMethod, setPayMethod] = useState(PAYMENT_METHODS[0]);
   const receiptRef = useRef(null);
 
   const filtered = bills.filter(b => {
-    const matchSearch = b.patientName.toLowerCase().includes(search.toLowerCase()) || b.id.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = b.patient.name.toLowerCase().includes(search.toLowerCase()) || b.id.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'All' || b.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
-  //  Form helpers
   const handlePatientChange = (e) => {
-    const patient = patients.find(p => p.id === e.target.value);
-    setForm(f => ({ ...f, patientId: patient?.id || '', patientName: patient?.name || '' }));
+    setForm(f => ({ ...f, patientId: e.target.value }));
   };
 
   const updateItem = (index, field, value) => {
@@ -51,19 +55,25 @@ export default function Billing() {
     e.preventDefault();
     if (!form.patientId || form.items.some(it => !it.description || !it.amount)) return;
     const items = form.items.map(it => ({ description: it.description, amount: parseFloat(it.amount) }));
-    addBill({ patientId: form.patientId, patientName: form.patientName, items, total });
-    setShowCreateModal(false);
-    setForm(INITIAL_FORM);
+    createMutation.mutate({ patientId: form.patientId, items }, {
+      onSuccess: () => {
+        setShowCreateModal(false);
+        setForm(INITIAL_FORM);
+      },
+    });
   };
 
   const handlePay = (e) => {
     e.preventDefault();
     const amt = parseFloat(payAmount);
     if (!amt || amt <= 0) return;
-    recordPayment(showPayModal.id, amt, payMethod);
-    setShowPayModal(null);
-    setPayAmount('');
-    setPayMethod('Cash');
+    payMutation.mutate({ billId: showPayModal.id, input: { amount: amt, method: payMethod } }, {
+      onSuccess: () => {
+        setShowPayModal(null);
+        setPayAmount('');
+        setPayMethod(PAYMENT_METHODS[0]);
+      },
+    });
   };
 
   const handlePrint = () => {
@@ -89,8 +99,8 @@ export default function Billing() {
             <div className="receipt-line" />
             <div className="receipt-row"><span>Receipt #:</span><span>{bill.id}</span></div>
             <div className="receipt-row"><span>Date:</span><span>{bill.date}</span></div>
-            <div className="receipt-row"><span>Patient:</span><span>{bill.patientName}</span></div>
-            <div className="receipt-row"><span>Patient ID:</span><span>{bill.patientId}</span></div>
+            <div className="receipt-row"><span>Patient:</span><span>{bill.patient.name}</span></div>
+            <div className="receipt-row"><span>Patient ID:</span><span>{bill.patient.id}</span></div>
             <div className="receipt-line" />
             <div style={{ marginBottom: 8, fontWeight: 600, fontSize: '0.85rem' }}>Services:</div>
             {bill.items.map((item, i) => (
@@ -115,7 +125,7 @@ export default function Billing() {
             )}
             <div className="receipt-line" />
             <div className="receipt-row"><span>Payment Method:</span><span>{bill.paymentMethod || '—'}</span></div>
-            <div className="receipt-row"><span>Status:</span><span style={{ fontWeight: 700, color: bill.status === 'Paid' ? '#22c55e' : '#f59e0b' }}>{bill.status}</span></div>
+            <div className="receipt-row"><span>Status:</span><span style={{ fontWeight: 700, color: bill.status === 'PAID' ? '#22c55e' : '#f59e0b' }}>{titleCase(bill.status)}</span></div>
             <div className="receipt-line" />
             <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#999', marginTop: 16 }}>
               Thank you for choosing MediCare Hospital.<br />This is a computer-generated receipt.
@@ -131,13 +141,19 @@ export default function Billing() {
       <PageHeader title="Billing & Payments" />
 
       <div className="page-body fade-in">
+        {error && (
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span>Failed to load bills: {error.message}</span>
+            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 150 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option>All</option>
-              <option>Paid</option>
-              <option>Unpaid</option>
-              <option>Partial</option>
+              <option value="All">All</option>
+              <option value="PAID">Paid</option>
+              <option value="UNPAID">Unpaid</option>
+              <option value="PARTIAL">Partial</option>
             </select>
             <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{filtered.length} bills</span>
           </div>
@@ -152,7 +168,7 @@ export default function Billing() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {!isLoading && filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><FiDollarSign /></div>
             <h3>No bills found</h3>
@@ -174,24 +190,27 @@ export default function Billing() {
                 </tr>
               </thead>
               <tbody>
+                {isLoading && (
+                  <tr><td colSpan={8} className="text-muted" style={{ textAlign: 'center', padding: 24 }}>Loading…</td></tr>
+                )}
                 {filtered.map(b => (
                   <tr key={b.id}>
                     <td><span className="badge badge-accent">{b.id}</span></td>
                     <td>{b.date}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{b.patientName}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{b.patient.name}</td>
                     <td>GH₵{b.total.toFixed(2)}</td>
                     <td>GH₵{b.paid.toFixed(2)}</td>
                     <td style={{ color: b.total - b.paid > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
                       GH₵{(b.total - b.paid).toFixed(2)}
                     </td>
                     <td>
-                      <span className={`badge ${b.status === 'Paid' ? 'badge-success' : b.status === 'Partial' ? 'badge-warning' : 'badge-danger'}`}>
-                        {b.status}
+                      <span className={`badge ${b.status === 'PAID' ? 'badge-success' : b.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`}>
+                        {titleCase(b.status)}
                       </span>
                     </td>
                     <td>
                       <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
-                        {b.status !== 'Paid' && (
+                        {b.status !== 'PAID' && (
                           <button className="btn btn-success btn-sm" onClick={() => { setShowPayModal(b); setPayAmount(String(b.total - b.paid)); }} title="Record Payment">
                             <FiCreditCard /> Pay
                           </button>
@@ -219,6 +238,11 @@ export default function Billing() {
             </div>
             <form onSubmit={handleCreateBill}>
               <div className="modal-body">
+                {createMutation.error && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {createMutation.error.message}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Patient *</label>
                   <select className="form-control" value={form.patientId} onChange={handlePatientChange} required>
@@ -277,7 +301,7 @@ export default function Billing() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create Bill</button>
+                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating…' : 'Create Bill'}</button>
               </div>
             </form>
           </div>
@@ -294,8 +318,13 @@ export default function Billing() {
             </div>
             <form onSubmit={handlePay}>
               <div className="modal-body">
+                {payMutation.error && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {payMutation.error.message}
+                  </div>
+                )}
                 <p className="text-muted" style={{ marginBottom: 16 }}>
-                  Bill <strong>{showPayModal.id}</strong> for <strong>{showPayModal.patientName}</strong><br />
+                  Bill <strong>{showPayModal.id}</strong> for <strong>{showPayModal.patient.name}</strong><br />
                   Balance due: <strong style={{ color: 'var(--color-danger)' }}>GH₵{(showPayModal.total - showPayModal.paid).toFixed(2)}</strong>
                 </p>
                 <div className="form-group">
@@ -305,16 +334,13 @@ export default function Billing() {
                 <div className="form-group">
                   <label>Payment Method</label>
                   <select className="form-control" value={payMethod} onChange={e => setPayMethod(e.target.value)}>
-                    <option>Cash</option>
-                    <option>Card</option>
-                    <option>Mobile Money</option>
-                    <option>Bank Transfer</option>
+                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{titleCase(m)}</option>)}
                   </select>
                 </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(null)}>Cancel</button>
-                <button type="submit" className="btn btn-success">Record Payment</button>
+                <button type="submit" className="btn btn-success" disabled={payMutation.isPending}>{payMutation.isPending ? 'Recording…' : 'Record Payment'}</button>
               </div>
             </form>
           </div>

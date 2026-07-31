@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { usePatients } from '../hooks';
 import {
   FiActivity, FiAlertTriangle, FiCheck, FiLoader,
   FiUser, FiThermometer, FiFileText, FiZap
@@ -48,7 +48,7 @@ function parseAIResponse(text) {
 }
 
 export default function DecisionSupport() {
-  const { patients } = useData();
+  const { data: patients = [], isLoading } = usePatients();
   const [patientId, setPatientId] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [loading, setLoading] = useState(false);
@@ -157,6 +157,7 @@ Important: Be thorough but concise. Always consider the most serious possibiliti
                 onChange={(e) => setPatientId(e.target.value)}
               >
                 <option value="">No patient selected</option>
+                {isLoading && <option disabled>Loading patients…</option>}
                 {patients.map(p => (
                   <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
                 ))}

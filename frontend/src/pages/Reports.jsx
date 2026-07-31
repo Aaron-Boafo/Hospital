@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { useData } from '../context/DataContext';
+import { usePatients, useDoctors, useAppointments, useBills } from '../hooks';
 import {
   FiDollarSign, FiCalendar, FiUsers, FiTrendingUp,
-  FiDownload, FiFilter, FiBarChart2, FiClock, FiCheckCircle, FiXCircle
+  FiDownload, FiFilter, FiBarChart2
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
@@ -65,8 +65,13 @@ function DonutLegend({ items }) {
 }
 
 export default function Reports() {
-  const { patients, doctors, appointments, bills, activities, bedStats } = useData();
+  const { data: patients = [], isLoading: patientsLoading } = usePatients();
+  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
+  const { data: appointments = [], isLoading: appointmentsLoading } = useAppointments();
+  const { data: bills = [], isLoading: billsLoading } = useBills();
   const [period, setPeriod] = useState('today');
+
+  const loading = patientsLoading || doctorsLoading || appointmentsLoading || billsLoading;
 
   const range = useMemo(() => getRange(period), [period]);
 
@@ -89,14 +94,14 @@ export default function Reports() {
   const totalBilled = filteredBills.reduce((sum, b) => sum + b.total, 0);
   const outstanding = totalBilled - totalRevenue;
 
-  const completedApts = filteredAppointments.filter(a => a.status === 'Completed').length;
-  const scheduledApts = filteredAppointments.filter(a => a.status === 'Scheduled').length;
-  const cancelledApts = filteredAppointments.filter(a => a.status === 'Cancelled').length;
+  const completedApts = filteredAppointments.filter(a => a.status === 'COMPLETED').length;
+  const scheduledApts = filteredAppointments.filter(a => a.status === 'SCHEDULED').length;
+  const cancelledApts = filteredAppointments.filter(a => a.status === 'CANCELLED').length;
 
   const deptData = useMemo(() => {
     const deptMap = {};
     filteredAppointments.forEach(a => {
-      const doc = doctors.find(d => d.id === a.doctorId);
+      const doc = doctors.find(d => d.name === a.doctor.name);
       const dept = doc?.department || 'Unknown';
       deptMap[dept] = (deptMap[dept] || 0) + 1;
     });
@@ -108,7 +113,7 @@ export default function Reports() {
   const doctorData = useMemo(() => {
     const docMap = {};
     filteredAppointments.forEach(a => {
-      docMap[a.doctorName] = (docMap[a.doctorName] || 0) + 1;
+      docMap[a.doctor.name] = (docMap[a.doctor.name] || 0) + 1;
     });
     return Object.entries(docMap)
       .map(([name, count]) => ({ name: name.replace('Dr. ', ''), count }))
@@ -126,17 +131,6 @@ export default function Reports() {
       .slice(-7)
       .map(([date, amount]) => ({ label: date.slice(5), amount }));
   }, [filteredBills]);
-
-  const dailyPatients = useMemo(() => {
-    const map = {};
-    filteredPatients.forEach(p => {
-      map[p.createdAt] = (map[p.createdAt] || 0) + 1;
-    });
-    return Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-7)
-      .map(([date, count]) => ({ label: date.slice(5), count }));
-  }, [filteredPatients]);
 
   const avgRevenuePerDay = dailyRevenue.length > 0
     ? Math.round(dailyRevenue.reduce((s, d) => s + d.amount, 0) / dailyRevenue.length)
@@ -170,11 +164,11 @@ export default function Reports() {
       [],
       ['APPOINTMENTS'],
       ['ID', 'Date', 'Time', 'Patient', 'Doctor', 'Status', 'Notes'],
-      ...filteredAppointments.map(a => [a.id, a.date, a.time, a.patientName, a.doctorName, a.status, a.notes || '']),
+      ...filteredAppointments.map(a => [a.id, a.date, a.time, a.patient.name, a.doctor.name, a.status, a.notes || '']),
       [],
       ['BILLS'],
       ['ID', 'Date', 'Patient', 'Total', 'Paid', 'Balance', 'Status', 'Payment Method'],
-      ...filteredBills.map(b => [b.id, b.date, b.patientName, b.total, b.paid, b.total - b.paid, b.status, b.paymentMethod || '']),
+      ...filteredBills.map(b => [b.id, b.date, b.patient.name, b.total, b.paid, b.total - b.paid, b.status, b.paymentMethod || '']),
       [],
       ['DEPARTMENT BREAKDOWN'],
       ['Department', 'Appointments'],
@@ -218,28 +212,29 @@ export default function Reports() {
             <div className="stat-icon accent"><FiDollarSign /></div>
             <div className="stat-info">
               <h4>Revenue Collected</h4>
-              <div className="stat-value">GH₵{totalRevenue.toLocaleString()}</div>
+              <div className="stat-value">GH₵{loading ? '—' : totalRevenue.toLocaleString()}</div>
             </div>
           </div>
           <div className="stat-card success">
             <div className="stat-icon success"><FiCalendar /></div>
             <div className="stat-info">
               <h4>Appointments</h4>
-              <div className="stat-value">{filteredAppointments.length}</div>
+              <div className="stat-value">{loading ? '—' : filteredAppointments.length}</div>
             </div>
           </div>
           <div className="stat-card info">
             <div className="stat-icon info"><FiUsers /></div>
             <div className="stat-info">
               <h4>Bed Occupancy</h4>
-              <div className="stat-value">{bedStats?.occupied || 0}/{bedStats?.total || 0}</div>
+              <div className="stat-value">0/0</div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Available after beds module</div>
             </div>
           </div>
           <div className="stat-card warning">
             <div className="stat-icon warning"><FiTrendingUp /></div>
             <div className="stat-info">
               <h4>Outstanding</h4>
-              <div className="stat-value">GH₵{outstanding.toLocaleString()}</div>
+              <div className="stat-value">GH₵{loading ? '—' : outstanding.toLocaleString()}</div>
             </div>
           </div>
         </div>

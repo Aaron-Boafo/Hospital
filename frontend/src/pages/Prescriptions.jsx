@@ -1,50 +1,44 @@
 import { useState } from 'react';
-import { useData } from '../context/DataContext';
+import { usePrescriptions, usePatients, useMedicines, useCreatePrescription, useDispensePrescription } from '../hooks';
 import {
   FiSearch, FiPlus, FiX, FiCheckCircle, FiClock, FiUser,
   FiPackage, FiDollarSign, FiAlertCircle, FiTrash2
 } from 'react-icons/fi';
 import PageHeader from '../components/PageHeader';
 
+const EMPTY_ITEM = { medicineId: '', dosage: '', frequency: '', duration: '', quantity: 1 };
+
+const titleCase = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '—');
+
 export default function Prescriptions() {
-  const { patients, medicines, prescriptions, createPrescription, dispensePrescription } = useData();
+  const { data: prescriptions = [], isLoading, error, refetch } = usePrescriptions();
+  const { data: patients = [] } = usePatients();
+  const { data: medicines = [] } = useMedicines();
+  const createMutation = useCreatePrescription();
+  const dispenseMutation = useDispensePrescription();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formPatientId, setFormPatientId] = useState('');
   const [formDoctor, setFormDoctor] = useState('');
-  const [prxItems, setPrxItems] = useState([{ medicineId: '', medicineName: '', dosage: '', frequency: '', duration: '', quantity: 1, total: 0 }]);
+  const [prxItems, setPrxItems] = useState([EMPTY_ITEM]);
 
   const filtered = prescriptions.filter(p => {
-    const matchSearch = p.patientName.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = p.patient.name.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'All' || p.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
   const handlePatientChange = (e) => {
-    const patient = patients.find(p => p.id === e.target.value);
-    setFormPatientId(patient?.id || '');
+    setFormPatientId(e.target.value);
   };
 
   const updateItem = (index, field, value) => {
-    setPrxItems(prev => prev.map((item, i) => {
-      if (i !== index) return item;
-      const updated = { ...item, [field]: value };
-      if (field === 'medicineId') {
-        const med = medicines.find(m => m.id === value);
-        updated.medicineName = med?.name || '';
-        updated.total = med ? med.unitPrice * updated.quantity : 0;
-      }
-      if (field === 'quantity') {
-        const med = medicines.find(m => m.id === item.medicineId);
-        updated.total = med ? med.unitPrice * parseInt(value || 0) : 0;
-      }
-      return updated;
-    }));
+    setPrxItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
 
   const addItem = () => {
-    setPrxItems(prev => [...prev, { medicineId: '', medicineName: '', dosage: '', frequency: '', duration: '', quantity: 1, total: 0 }]);
+    setPrxItems(prev => [...prev, EMPTY_ITEM]);
   };
 
   const removeItem = (index) => {
@@ -52,45 +46,63 @@ export default function Prescriptions() {
     setPrxItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const totalAmount = prxItems.reduce((sum, item) => sum + item.total, 0);
+  const totalAmount = prxItems.reduce((sum, item) => {
+    const med = medicines.find(m => m.id === item.medicineId);
+    return sum + (med ? med.unitPrice * (parseInt(item.quantity) || 0) : 0);
+  }, 0);
 
   const handleCreate = (e) => {
     e.preventDefault();
     if (!formPatientId || prxItems.some(i => !i.medicineId || !i.dosage)) return;
-    const patient = patients.find(p => p.id === formPatientId);
-    createPrescription({
-      patientId: formPatientId, patientName: patient?.name || '',
-      doctorName: formDoctor, items: prxItems,
+    createMutation.mutate({
+      patientId: formPatientId,
+      doctorName: formDoctor || undefined,
+      items: prxItems.map(i => ({
+        medicineId: i.medicineId,
+        dosage: i.dosage,
+        quantity: parseInt(i.quantity) || 1,
+        frequency: i.frequency || undefined,
+        duration: i.duration || undefined,
+      })),
+    }, {
+      onSuccess: () => {
+        setShowCreateModal(false);
+        setFormPatientId('');
+        setFormDoctor('');
+        setPrxItems([EMPTY_ITEM]);
+      },
     });
-    setShowCreateModal(false);
-    setFormPatientId('');
-    setFormDoctor('');
-    setPrxItems([{ medicineId: '', medicineName: '', dosage: '', frequency: '', duration: '', quantity: 1, total: 0 }]);
   };
 
   const handleDispense = (id) => {
     if (confirm('Dispense this prescription? Stock will be deducted and a bill will be created.')) {
-      dispensePrescription(id);
+      dispenseMutation.mutate(id);
     }
   };
 
-  const statusColors = { Pending: 'badge-warning', Dispensed: 'badge-success', Partial: 'badge-info' };
+  const statusColors = { PENDING: 'badge-warning', DISPENSED: 'badge-success', PARTIAL: 'badge-info' };
 
   return (
     <>
       <PageHeader title="Prescriptions" subtitle="Create and dispense medication prescriptions" />
 
       <div className="page-body fade-in">
+        {error && (
+          <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span>Failed to load prescriptions: {error.message}</span>
+            <button className="btn btn-sm btn-secondary" onClick={() => refetch()}>Retry</button>
+          </div>
+        )}
         <div className="toolbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <select className="form-control" style={{ width: 160 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option>All</option>
-              <option>Pending</option>
-              <option>Dispensed</option>
-              <option>Partial</option>
+              <option value="All">All</option>
+              <option value="PENDING">Pending</option>
+              <option value="DISPENSED">Dispensed</option>
+              <option value="PARTIAL">Partial</option>
             </select>
             <span className="text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-              {prescriptions.filter(p => p.status === 'Pending').length} pending • {filtered.length} total
+              {prescriptions.filter(p => p.status === 'PENDING').length} pending • {filtered.length} total
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -104,7 +116,7 @@ export default function Prescriptions() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {!isLoading && filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon"><FiPackage /></div>
             <h3>No prescriptions found</h3>
@@ -112,25 +124,28 @@ export default function Prescriptions() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {isLoading && (
+              <p className="text-muted" style={{ padding: 24 }}>Loading…</p>
+            )}
             {filtered.map(p => (
               <div key={p.id} className="card" style={{
-                borderLeft: `3px solid ${p.status === 'Dispensed' ? 'var(--color-success)' : p.status === 'Partial' ? 'var(--color-info)' : 'var(--color-warning)'}`,
+                borderLeft: `3px solid ${p.status === 'DISPENSED' ? 'var(--color-success)' : p.status === 'PARTIAL' ? 'var(--color-info)' : 'var(--color-warning)'}`,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                       <span className="badge badge-accent">{p.id}</span>
-                      <span className={`badge ${statusColors[p.status]}`}>{p.status}</span>
+                      <span className={`badge ${statusColors[p.status]}`}>{titleCase(p.status)}</span>
                       <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{p.date}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.88rem' }}>
                       <FiUser style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }} />
-                      <strong>{p.patientName}</strong>
+                      <strong>{p.patient.name}</strong>
                       {p.doctorName && <span style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>— {p.doctorName}</span>}
                     </div>
                   </div>
-                  {p.status === 'Pending' && (
-                    <button className="btn btn-success btn-sm" onClick={() => handleDispense(p.id)}>
+                  {p.status === 'PENDING' && (
+                    <button className="btn btn-success btn-sm" onClick={() => handleDispense(p.id)} disabled={dispenseMutation.isPending}>
                       <FiCheckCircle /> Dispense
                     </button>
                   )}
@@ -143,11 +158,11 @@ export default function Prescriptions() {
                       background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-sm)',
                       fontSize: '0.82rem',
                     }}>
-                      <span style={{ fontWeight: 600, flex: 2 }}>{item.medicineName}</span>
+                      <span style={{ fontWeight: 600, flex: 2 }}>{item.medicine.name}</span>
                       <span style={{ color: 'var(--color-text-muted)', flex: 1 }}>{item.dosage}</span>
                       <span style={{ color: 'var(--color-text-muted)', flex: 1 }}>{item.frequency}</span>
                       <span style={{ color: 'var(--color-text-muted)', flex: 1 }}>x{item.quantity}</span>
-                      {item.dispensed && <span style={{ color: item.dispensed === 'Dispensed' ? 'var(--color-success)' : 'var(--color-warning)', fontWeight: 600 }}>{item.dispensed}</span>}
+                      {item.dispensed && <span style={{ color: item.dispensed === 'DISPENSED' ? 'var(--color-success)' : 'var(--color-warning)', fontWeight: 600 }}>{titleCase(item.dispensed)}</span>}
                     </div>
                   ))}
                 </div>
@@ -171,6 +186,11 @@ export default function Prescriptions() {
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">
+                {createMutation.error && (
+                  <div style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', marginBottom: 16 }}>
+                    {createMutation.error.message}
+                  </div>
+                )}
                 <div className="form-row">
                   <div className="form-group">
                     <label>Patient *</label>
@@ -223,7 +243,7 @@ export default function Prescriptions() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create Prescription</button>
+                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating…' : 'Create Prescription'}</button>
               </div>
             </form>
           </div>

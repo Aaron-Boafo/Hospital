@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useData } from './DataContext';
 
 const ThemeContext = createContext(null);
 
@@ -14,21 +13,25 @@ function applyTheme(resolved) {
   document.documentElement.setAttribute('data-theme', resolved);
 }
 
-export function ThemeProvider({ children }) {
-  const { themePreference, updateTheme } = useData();
-
-  const [theme, setThemeState] = useState(() => {
-    const saved = (() => { try { return localStorage.getItem(LS_KEY); } catch {} })();
+function readStoredTheme() {
+  try {
+    const saved = localStorage.getItem(LS_KEY);
     if (saved === 'dark' || saved === 'light' || saved === 'system') return saved;
-    if (themePreference === 'dark' || themePreference === 'light' || themePreference === 'system') return themePreference;
-    return 'light';
-  });
+  } catch {
+    // localStorage unavailable (private mode)
+  }
+  return 'light';
+}
+
+export function ThemeProvider({ children }) {
+  const [theme, setThemeState] = useState(readStoredTheme);
 
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
-    updateTheme(newTheme);
-    try { localStorage.setItem(LS_KEY, newTheme); } catch {}
-  }, [updateTheme]);
+    try { localStorage.setItem(LS_KEY, newTheme); } catch {
+      // localStorage unavailable (private mode)
+    }
+  }, []);
 
   useEffect(() => {
     const resolved = theme === 'system' ? getSystemTheme() : theme;
